@@ -11,7 +11,13 @@ import { FACTORY_ERROR_TYPES } from "./errors.js";
  */
 export interface FactoryMethods {
   deploy_vault(
-    args: { owner: string; salt: Buffer },
+    args: {
+      owner: string;
+      token: string;
+      min_deposit: bigint;
+      max_balance: bigint | undefined;
+      salt: Buffer;
+    },
     options?: MethodOptions,
   ): Promise<AssembledTransaction<string>>;
   vault_count(options?: MethodOptions): Promise<AssembledTransaction<number>>;

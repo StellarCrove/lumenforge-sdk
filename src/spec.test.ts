@@ -14,6 +14,13 @@ function funcNames(spec: Spec): string[] {
   return spec.funcs().map((f) => f.name().toString());
 }
 
+function funcParamNames(spec: Spec, name: string): string[] {
+  return spec
+    .getFunc(name)
+    .inputs()
+    .map((i) => i.name().toString());
+}
+
 describe("lumen_vault spec", () => {
   const spec = loadSpec("lumen_vault.wasm");
   const names = funcNames(spec);
@@ -24,11 +31,17 @@ describe("lumen_vault spec", () => {
       "withdraw",
       "pause",
       "unpause",
+      "set_min_deposit",
+      "set_max_balance",
+      "rescue",
       "propose_owner",
       "accept_owner",
       "balance",
       "owner",
       "pending_owner",
+      "token",
+      "min_deposit",
+      "max_balance",
       "paused",
       "extend_ttl",
     ];
@@ -39,7 +52,16 @@ describe("lumen_vault spec", () => {
 
   it("declares the error codes VAULT_ERROR_TYPES expects", () => {
     const codes = spec.errorCases().map((e) => e.value());
-    expect(codes.sort()).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(codes.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  it("has a constructor matching DeployVaultArgs", () => {
+    expect(funcParamNames(spec, "__constructor")).toEqual([
+      "owner",
+      "token",
+      "min_deposit",
+      "max_balance",
+    ]);
   });
 });
 
@@ -63,6 +85,16 @@ describe("lumen_vault_factory spec", () => {
 
   it("declares the error codes FACTORY_ERROR_TYPES expects", () => {
     const codes = spec.errorCases().map((e) => e.value());
-    expect(codes.sort()).toEqual([1]);
+    expect(codes.sort((a, b) => a - b)).toEqual([1]);
+  });
+
+  it("deploy_vault takes token/min_deposit/max_balance alongside owner/salt", () => {
+    expect(funcParamNames(spec, "deploy_vault")).toEqual([
+      "owner",
+      "token",
+      "min_deposit",
+      "max_balance",
+      "salt",
+    ]);
   });
 });

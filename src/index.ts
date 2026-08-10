@@ -1,5 +1,10 @@
-export { connectVault } from "./vaultClient.js";
-export type { VaultClient, VaultMethods } from "./vaultClient.js";
+export { connectVault, deployVault } from "./vaultClient.js";
+export type {
+  VaultClient,
+  VaultMethods,
+  DeployVaultArgs,
+  DeployVaultOptions,
+} from "./vaultClient.js";
 
 export { connectFactory } from "./factoryClient.js";
 export type { FactoryClient, FactoryMethods } from "./factoryClient.js";
