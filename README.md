@@ -2,7 +2,8 @@
 
 TypeScript client SDK for the [LumenForge Soroban
 contracts](https://github.com/StellarCrove/lumenforge-contracts) on
-Stellar: `lumen_vault` and `lumen_vault_factory`.
+Stellar: `lumen_vault` (a real SEP-41 token vault) and
+`lumen_vault_factory`.
 
 Built on `@stellar/stellar-sdk`'s `contract.Client` — each connect call
 fetches the deployed contract's on-chain spec, so calls are validated and
@@ -21,7 +22,7 @@ npm install @lumenforge/sdk
 
 ## Usage
 
-### Vault
+### Connect to a vault
 
 ```ts
 import { connectVault } from "@lumenforge/sdk";
@@ -35,12 +36,36 @@ const vault = await connectVault({
 });
 
 const { result: balance } = await vault.balance();
+const { result: token } = await vault.token();
 
 const tx = await vault.deposit({ from: "G...", amount: 500n });
 await tx.signAndSend();
 ```
 
-### Factory
+### Deploy a new vault directly
+
+```ts
+import { deployVault } from "@lumenforge/sdk";
+
+const deployTx = await deployVault(
+  {
+    owner: "G...",
+    token: "C...", // the SEP-41 token this vault will custody
+    min_deposit: 0n,
+    max_balance: undefined, // or a bigint cap
+  },
+  {
+    wasmHash: "<lumen_vault wasm hash, already installed on-chain>",
+    networkPassphrase: "Test SDF Network ; September 2015",
+    rpcUrl: "https://soroban-testnet.stellar.org",
+    publicKey: "G...",
+    signTransaction,
+  },
+);
+const { result: vault } = await deployTx.signAndSend(); // a connected VaultClient
+```
+
+### Factory (deploy + index vaults on-chain)
 
 ```ts
 import { connectFactory, randomSalt } from "@lumenforge/sdk";
@@ -55,6 +80,9 @@ const factory = await connectFactory({
 
 const tx = await factory.deploy_vault({
   owner: "G...",
+  token: "C...",
+  min_deposit: 0n,
+  max_balance: undefined,
   salt: randomSalt(),
 });
 const { result: vaultAddress } = await tx.signAndSend();
@@ -66,10 +94,11 @@ a deterministic, reproducible vault address for a given
 
 ### Errors
 
-Both `connectVault` and `connectFactory` wire up `errorTypes` from
-`VAULT_ERROR_TYPES`/`FACTORY_ERROR_TYPES` automatically, so a failed call
-throws with a readable message (e.g. `InsufficientBalance: withdrawal
-exceeds the vault's balance.`) instead of a raw host trap.
+Both `connectVault` and `connectFactory` (and `deployVault`) wire up
+`errorTypes` from `VAULT_ERROR_TYPES`/`FACTORY_ERROR_TYPES` automatically,
+so a failed call throws with a readable message (e.g.
+`InsufficientBalance: withdrawal exceeds the vault's balance.`) instead
+of a raw host trap.
 
 ## Develop
 
@@ -81,11 +110,11 @@ npm run lint
 ```
 
 `src/spec.test.ts` parses the compiled contract Wasm checked into
-`test/fixtures/` and asserts every method this SDK exposes actually
-exists in the real contract spec (and that the declared error codes
-match) — so a Rust-side rename or removed method fails this SDK's tests,
-not just a runtime call. Regenerate the fixtures after changing the
-contracts:
+`test/fixtures/` and asserts every method/constructor param this SDK
+exposes actually exists in the real contract spec (names, param order,
+and declared error codes) — so a Rust-side rename or signature change
+fails this SDK's tests, not just a runtime call. Regenerate the fixtures
+after changing the contracts:
 
 ```bash
 cp ../lumenforge-contracts/target/wasm32v1-none/release/lumen_vault.wasm test/fixtures/

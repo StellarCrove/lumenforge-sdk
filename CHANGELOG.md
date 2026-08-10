@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-08-10
+
+### Added
+
+- `deployVault`: deploys a new `lumen_vault` directly (wrapping
+  `contract.Client.deploy`), for integrators not going through the
+  factory.
+- `token()`, `min_deposit()`, `max_balance()`, `set_min_deposit()`,
+  `set_max_balance()`, `rescue()` on `VaultMethods`, matching
+  `lumen_vault`'s real SEP-41 token custody.
+- `deploy_vault`'s `FactoryMethods` signature now includes `token`,
+  `min_deposit`, `max_balance` alongside `owner`/`salt`.
+- `spec.test.ts` now also asserts the vault's constructor and the
+  factory's `deploy_vault` have the exact param names/order this SDK's
+  types declare, and checks all 9 vault error codes (previously 6).
+
+### Changed
+
+- **Breaking**: `VaultMethods`/`DeployVaultArgs`/`FactoryMethods.deploy_vault`
+  all changed shape to match `lumenforge-contracts` v0.3.0's constructor
+  and `deploy_vault` signature changes (both now take `token`,
+  `min_deposit`, `max_balance`).
+
 ## [0.2.0] - 2026-08-10
 
 ### Added
