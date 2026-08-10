@@ -17,8 +17,24 @@ export const VAULT_ERROR_TYPES: Record<number, { message: string }> = {
     message: "NoPendingOwner: there is no ownership transfer to accept.",
   },
   6: { message: "Overflow: deposit would overflow the balance." },
+  7: {
+    message: "BelowMinimumDeposit: amount is below the vault's min_deposit.",
+  },
+  8: {
+    message: "ExceedsMaxBalance: deposit would push balance above max_balance.",
+  },
+  9: {
+    message: "CannotRescueVaultToken: rescue cannot move the vault's own token.",
+  },
+  10: {
+    message:
+      "InvalidConfiguration: min_deposit/max_balance cannot be negative.",
+  },
 };
 
 export const FACTORY_ERROR_TYPES: Record<number, { message: string }> = {
   1: { message: "NotInitialized: the factory has no vault Wasm hash set." },
+  2: {
+    message: "NoVaultsForOwner: this owner has never deployed a vault through this factory.",
+  },
 };
