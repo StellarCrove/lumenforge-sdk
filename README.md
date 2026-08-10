@@ -92,6 +92,17 @@ Use `ownerNonceSalt(owner, nonce)` instead of `randomSalt()` if you want
 a deterministic, reproducible vault address for a given
 `(owner, nonce)` pair.
 
+`vaults_by_owner` is paginated — pass `offset`/`limit` rather than
+assuming an owner has few vaults:
+
+```ts
+const { result: firstPage } = await factory.vaults_by_owner({
+  owner: "G...",
+  offset: 0,
+  limit: 20,
+});
+```
+
 ### Errors
 
 Both `connectVault` and `connectFactory` (and `deployVault`) wire up

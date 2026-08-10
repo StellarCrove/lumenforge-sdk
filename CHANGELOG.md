@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.1] - 2026-08-10
+
+### Fixed
+
+- `VAULT_ERROR_TYPES` was missing entries for error codes 7-10
+  (`BelowMinimumDeposit`, `ExceedsMaxBalance`, `CannotRescueVaultToken`,
+  `InvalidConfiguration`) — those calls would have thrown a raw host
+  error instead of a readable message. `FACTORY_ERROR_TYPES` was
+  similarly missing code 2 (`NoVaultsForOwner`).
+- `spec.test.ts` now asserts `VAULT_ERROR_TYPES`/`FACTORY_ERROR_TYPES`
+  cover *exactly* the error codes the compiled contract declares (no
+  missing, no stale extras), so this class of gap fails CI going
+  forward instead of only surfacing at runtime.
+
+### Changed
+
+- **Breaking**: `FactoryMethods.vaults_by_owner` now takes
+  `{ owner, offset, limit }`, matching `lumenforge-contracts`
+  v0.3.0's paginated `vaults_by_owner`.
+
 ## [0.3.0] - 2026-08-10
 
 ### Added
