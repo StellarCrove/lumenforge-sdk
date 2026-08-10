@@ -6,8 +6,17 @@ export type {
   DeployVaultOptions,
 } from "./vaultClient.js";
 
-export { connectFactory } from "./factoryClient.js";
-export type { FactoryClient, FactoryMethods } from "./factoryClient.js";
+export {
+  connectFactory,
+  iterateVaultsByOwner,
+  collectVaultsByOwner,
+} from "./factoryClient.js";
+export type {
+  FactoryClient,
+  FactoryMethods,
+  VaultsByOwnerReader,
+  PaginationOptions,
+} from "./factoryClient.js";
 
 export { randomSalt, ownerNonceSalt } from "./salt.js";
 
