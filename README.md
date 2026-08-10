@@ -1,7 +1,17 @@
 # lumenforge-sdk
 
-TypeScript client SDK for interacting with the [LumenForge Soroban
-contracts](https://github.com/lumenforge/lumenforge-contracts) on Stellar.
+TypeScript client SDK for the [LumenForge Soroban
+contracts](https://github.com/StellarCrove/lumenforge-contracts) on
+Stellar: `lumen_vault` and `lumen_vault_factory`.
+
+Built on `@stellar/stellar-sdk`'s `contract.Client` — each connect call
+fetches the deployed contract's on-chain spec, so calls are validated and
+results decoded automatically without hand-written XDR conversion.
+
+## Requirements
+
+Node.js ≥ 22 (matches `@stellar/stellar-sdk` 16's engine requirement —
+see `.nvmrc`).
 
 ## Install
 
@@ -11,16 +21,55 @@ npm install @lumenforge/sdk
 
 ## Usage
 
-```ts
-import { LumenVaultClient } from "@lumenforge/sdk";
+### Vault
 
-const client = new LumenVaultClient({
+```ts
+import { connectVault } from "@lumenforge/sdk";
+
+const vault = await connectVault({
   contractId: "C...",
+  networkPassphrase: "Test SDF Network ; September 2015",
   rpcUrl: "https://soroban-testnet.stellar.org",
+  publicKey: "G...",
+  signTransaction, // e.g. from a wallet extension
 });
 
-const balance = await client.balance();
+const { result: balance } = await vault.balance();
+
+const tx = await vault.deposit({ from: "G...", amount: 500n });
+await tx.signAndSend();
 ```
+
+### Factory
+
+```ts
+import { connectFactory, randomSalt } from "@lumenforge/sdk";
+
+const factory = await connectFactory({
+  contractId: "C...",
+  networkPassphrase: "Test SDF Network ; September 2015",
+  rpcUrl: "https://soroban-testnet.stellar.org",
+  publicKey: "G...",
+  signTransaction,
+});
+
+const tx = await factory.deploy_vault({
+  owner: "G...",
+  salt: randomSalt(),
+});
+const { result: vaultAddress } = await tx.signAndSend();
+```
+
+Use `ownerNonceSalt(owner, nonce)` instead of `randomSalt()` if you want
+a deterministic, reproducible vault address for a given
+`(owner, nonce)` pair.
+
+### Errors
+
+Both `connectVault` and `connectFactory` wire up `errorTypes` from
+`VAULT_ERROR_TYPES`/`FACTORY_ERROR_TYPES` automatically, so a failed call
+throws with a readable message (e.g. `InsufficientBalance: withdrawal
+exceeds the vault's balance.`) instead of a raw host trap.
 
 ## Develop
 
@@ -28,9 +77,22 @@ const balance = await client.balance();
 npm install
 npm run build
 npm test
+npm run lint
+```
+
+`src/spec.test.ts` parses the compiled contract Wasm checked into
+`test/fixtures/` and asserts every method this SDK exposes actually
+exists in the real contract spec (and that the declared error codes
+match) — so a Rust-side rename or removed method fails this SDK's tests,
+not just a runtime call. Regenerate the fixtures after changing the
+contracts:
+
+```bash
+cp ../lumenforge-contracts/target/wasm32v1-none/release/lumen_vault.wasm test/fixtures/
+cp ../lumenforge-contracts/target/wasm32v1-none/release/lumen_vault_factory.wasm test/fixtures/
 ```
 
 ## Related
 
-- [`lumenforge-contracts`](https://github.com/lumenforge/lumenforge-contracts)
+- [`lumenforge-contracts`](https://github.com/StellarCrove/lumenforge-contracts)
   — the Soroban contracts this SDK talks to.
