@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.2] - 2026-08-10
+
+### Added
+
+- `iterateVaultsByOwner`/`collectVaultsByOwner`: page through all of an
+  owner's vaults without hand-writing the offset loop. Both are
+  guaranteed to terminate — they stop at the first short page, and throw
+  (never hang) if `maxPages` (default 1000) is exceeded without that
+  happening, e.g. against a contract that always returns full pages.
+- `factoryClient.test.ts` covers empty/short/multi-page pagination, lazy
+  early-exit from the generator (verifies later pages aren't fetched
+  after a `break`), and a runaway-loop test that asserts the maxPages
+  guard fires within 1s rather than hanging.
+
+### Changed
+
+- Regenerated `test/fixtures/*.wasm` against `lumenforge-contracts`
+  v0.3.2 (`lumen_vault::token()` now returns a `Result`, matching
+  `owner()` — no SDK-side type change needed, `VaultMethods.token`
+  already declared this shape).
+
 ## [0.3.1] - 2026-08-10
 
 ### Fixed

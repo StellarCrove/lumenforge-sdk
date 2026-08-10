@@ -103,6 +103,25 @@ const { result: firstPage } = await factory.vaults_by_owner({
 });
 ```
 
+To walk *every* vault an owner has without hand-rolling the offset loop,
+use `collectVaultsByOwner` (or `iterateVaultsByOwner` if you want to
+process results as they arrive instead of waiting for the whole list):
+
+```ts
+import { collectVaultsByOwner, iterateVaultsByOwner } from "@lumenforge/sdk";
+
+const allVaults = await collectVaultsByOwner(factory, "G...");
+
+for await (const vault of iterateVaultsByOwner(factory, "G...", { pageSize: 50 })) {
+  // process one at a time; stops fetching further pages if you `break`
+}
+```
+
+Both are guaranteed to terminate: they stop at the first page shorter
+than `pageSize`, and throw (rather than loop forever) if `maxPages`
+(default 1000) is hit without that ever happening — protection against a
+misbehaving contract that always returns full pages.
+
 ### Errors
 
 Both `connectVault` and `connectFactory` (and `deployVault`) wire up

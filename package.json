@@ -1,6 +1,6 @@
 {
   "name": "@lumenforge/sdk",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "TypeScript client SDK for the LumenForge Soroban contracts on Stellar",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
