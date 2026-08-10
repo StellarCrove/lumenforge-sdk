@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Spec } from "@stellar/stellar-sdk/contract";
 import { describe, expect, it } from "vitest";
+import { VAULT_ERROR_TYPES, FACTORY_ERROR_TYPES } from "./errors.js";
 
 const fixturesDir = fileURLToPath(new URL("../test/fixtures/", import.meta.url));
 
@@ -19,6 +20,13 @@ function funcParamNames(spec: Spec, name: string): string[] {
     .getFunc(name)
     .inputs()
     .map((i) => i.name().toString());
+}
+
+function errorCodes(spec: Spec): number[] {
+  return spec
+    .errorCases()
+    .map((e) => e.value())
+    .sort((a, b) => a - b);
 }
 
 describe("lumen_vault spec", () => {
@@ -50,9 +58,12 @@ describe("lumen_vault spec", () => {
     }
   });
 
-  it("declares the error codes VAULT_ERROR_TYPES expects", () => {
-    const codes = spec.errorCases().map((e) => e.value());
-    expect(codes.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  it("VAULT_ERROR_TYPES has an entry for every declared error code, and no extras", () => {
+    const declared = errorCodes(spec);
+    const covered = Object.keys(VAULT_ERROR_TYPES)
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(covered).toEqual(declared);
   });
 
   it("has a constructor matching DeployVaultArgs", () => {
@@ -83,9 +94,12 @@ describe("lumen_vault_factory spec", () => {
     }
   });
 
-  it("declares the error codes FACTORY_ERROR_TYPES expects", () => {
-    const codes = spec.errorCases().map((e) => e.value());
-    expect(codes.sort((a, b) => a - b)).toEqual([1]);
+  it("FACTORY_ERROR_TYPES has an entry for every declared error code, and no extras", () => {
+    const declared = errorCodes(spec);
+    const covered = Object.keys(FACTORY_ERROR_TYPES)
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(covered).toEqual(declared);
   });
 
   it("deploy_vault takes token/min_deposit/max_balance alongside owner/salt", () => {
@@ -96,5 +110,18 @@ describe("lumen_vault_factory spec", () => {
       "max_balance",
       "salt",
     ]);
+  });
+
+  it("vaults_by_owner is paginated", () => {
+    expect(funcParamNames(spec, "vaults_by_owner")).toEqual([
+      "owner",
+      "offset",
+      "limit",
+    ]);
+  });
+
+  it("extend_vaults_by_owner_ttl returns a Result (declares an error case)", () => {
+    // A void-returning function has no error outputs; this one now does.
+    expect(spec.getFunc("extend_vaults_by_owner_ttl").outputs().length).toBeGreaterThan(0);
   });
 });

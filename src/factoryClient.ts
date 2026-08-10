@@ -22,7 +22,7 @@ export interface FactoryMethods {
   ): Promise<AssembledTransaction<string>>;
   vault_count(options?: MethodOptions): Promise<AssembledTransaction<number>>;
   vaults_by_owner(
-    args: { owner: string },
+    args: { owner: string; offset: number; limit: number },
     options?: MethodOptions,
   ): Promise<AssembledTransaction<string[]>>;
   vault_wasm_hash(
@@ -35,7 +35,7 @@ export interface FactoryMethods {
   extend_vaults_by_owner_ttl(
     args: { owner: string; threshold: number; extend_to: number },
     options?: MethodOptions,
-  ): Promise<AssembledTransaction<null>>;
+  ): Promise<AssembledTransaction<null>>; // rejects if the owner has no vaults
 }
 
 export type FactoryClient = Client & FactoryMethods;
