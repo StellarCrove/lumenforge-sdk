@@ -85,6 +85,7 @@ describe("lumen_vault_factory spec", () => {
       "deploy_vault",
       "vault_count",
       "vaults_by_owner",
+      "vaults_by_owner_count",
       "vault_wasm_hash",
       "extend_ttl",
       "extend_vaults_by_owner_ttl",
@@ -118,6 +119,10 @@ describe("lumen_vault_factory spec", () => {
       "offset",
       "limit",
     ]);
+  });
+
+  it("vaults_by_owner_count takes just an owner", () => {
+    expect(funcParamNames(spec, "vaults_by_owner_count")).toEqual(["owner"]);
   });
 
   it("extend_vaults_by_owner_ttl returns a Result (declares an error case)", () => {

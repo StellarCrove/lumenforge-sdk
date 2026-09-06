@@ -71,11 +71,81 @@ describe("iterateVaultsByOwner / collectVaultsByOwner", () => {
     expect(vaults).toEqual(["v1", "v2"]);
   });
 
-  it("rejects a non-positive pageSize instead of looping", async () => {
+  it("rejects a non-positive or fractional pageSize/maxPages instead of looping", async () => {
     const reader = fakeReader([[]]);
     await expect(
       collectVaultsByOwner(reader, "GOWNER", { pageSize: 0 }),
-    ).rejects.toThrow(/pageSize must be positive/);
+    ).rejects.toThrow(/pageSize must be a positive integer/);
+    await expect(
+      collectVaultsByOwner(reader, "GOWNER", { pageSize: 2.5 }),
+    ).rejects.toThrow(/pageSize must be a positive integer/);
+    await expect(
+      collectVaultsByOwner(reader, "GOWNER", { maxPages: 0 }),
+    ).rejects.toThrow(/maxPages must be a positive integer/);
+  });
+
+  describe("with a reader that exposes vaults_by_owner_count", () => {
+    function countingReader(all: string[]) {
+      const calls: Array<{ offset: number; limit: number }> = [];
+      const reader: VaultsByOwnerReader & {
+        calls: typeof calls;
+        countCalls: number;
+      } = {
+        calls,
+        countCalls: 0,
+        async vaults_by_owner_count() {
+          reader.countCalls++;
+          return { result: all.length };
+        },
+        async vaults_by_owner({ offset, limit }) {
+          calls.push({ offset, limit });
+          return { result: all.slice(offset, offset + limit) };
+        },
+      };
+      return reader;
+    }
+
+    it("reads the count once and stops at exactly that many, no short-page probe", async () => {
+      const reader = countingReader(["v1", "v2", "v3", "v4"]);
+      const vaults = await collectVaultsByOwner(reader, "GOWNER", { pageSize: 2 });
+      expect(vaults).toEqual(["v1", "v2", "v3", "v4"]);
+      expect(reader.countCalls).toBe(1);
+      // Exactly two page reads for four vaults — no third "is there more?" call.
+      expect(reader.calls).toEqual([
+        { offset: 0, limit: 2 },
+        { offset: 2, limit: 2 },
+      ]);
+    });
+
+    it("clamps the final page's limit to what's left", async () => {
+      const reader = countingReader(["v1", "v2", "v3"]);
+      const vaults = await collectVaultsByOwner(reader, "GOWNER", { pageSize: 2 });
+      expect(vaults).toEqual(["v1", "v2", "v3"]);
+      expect(reader.calls).toEqual([
+        { offset: 0, limit: 2 },
+        { offset: 2, limit: 1 },
+      ]);
+    });
+
+    it("yields nothing (and makes no page call) for a zero count", async () => {
+      const reader = countingReader([]);
+      const vaults = await collectVaultsByOwner(reader, "GOWNER");
+      expect(vaults).toEqual([]);
+      expect(reader.calls).toEqual([]);
+    });
+
+    it("terminates even if the contract under-reports its own count", async () => {
+      const reader: VaultsByOwnerReader = {
+        async vaults_by_owner_count() {
+          return { result: 100 };
+        },
+        async vaults_by_owner() {
+          return { result: [] }; // claims 100 but serves none
+        },
+      };
+      const vaults = await collectVaultsByOwner(reader, "GOWNER", { pageSize: 10 });
+      expect(vaults).toEqual([]);
+    });
   });
 
   it("never loops forever against a contract that always returns full pages — throws at maxPages instead", async () => {

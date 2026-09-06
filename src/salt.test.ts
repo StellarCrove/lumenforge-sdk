@@ -37,4 +37,13 @@ describe("ownerNonceSalt", () => {
     const b = await ownerNonceSalt(other, 0);
     expect(a.equals(b)).toBe(false);
   });
+
+  it("rejects a fractional, negative, or unsafe nonce", async () => {
+    await expect(ownerNonceSalt(owner, 1.5)).rejects.toThrow(/safe integer/);
+    await expect(ownerNonceSalt(owner, -1)).rejects.toThrow(/safe integer/);
+    await expect(ownerNonceSalt(owner, NaN)).rejects.toThrow(/safe integer/);
+    await expect(
+      ownerNonceSalt(owner, Number.MAX_SAFE_INTEGER + 1),
+    ).rejects.toThrow(/safe integer/);
+  });
 });
