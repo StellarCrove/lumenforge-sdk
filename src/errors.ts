@@ -37,4 +37,7 @@ export const FACTORY_ERROR_TYPES: Record<number, { message: string }> = {
   2: {
     message: "NoVaultsForOwner: this owner has never deployed a vault through this factory.",
   },
+  3: {
+    message: "CountOverflow: the factory's vault counter would exceed u32::MAX.",
+  },
 };

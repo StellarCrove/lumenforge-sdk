@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-09-06
+
+### Added
+
+- `FactoryMethods.vaults_by_owner_count({ owner })` — mirrors the new
+  `lumen_vault_factory` read method (contracts v0.3.1). Returns an
+  owner's vault total.
+- `FACTORY_ERROR_TYPES` entry for code 3 (`CountOverflow`).
+- `salt.test.ts` covers rejection of a fractional / negative / unsafe
+  `nonce`; `factoryClient.test.ts` covers the new count-driven iteration
+  path (exact-count stop, last-page clamp, zero count, and termination
+  when a contract under-reports its count).
+
+### Changed
+
+- `iterateVaultsByOwner` / `collectVaultsByOwner`: when the reader
+  exposes `vaults_by_owner_count`, they now read the total once and
+  iterate to exactly that many — no short-page probe, `maxPages`
+  unused. Readers without it keep the previous short-page + `maxPages`
+  behaviour. Existing callers passing a real `connectFactory` client
+  get the deterministic path automatically.
+- `iterateVaultsByOwner` now rejects a non-integer `pageSize` or
+  `maxPages` (previously only `pageSize <= 0` was checked).
+- `ownerNonceSalt` throws on a fractional, negative, or unsafe-integer
+  `nonce` instead of hashing a value the caller can't reproduce.
+- Regenerated `test/fixtures/*.wasm` against `lumenforge-contracts`
+  v0.3.1 / `lumen_vault` v0.3.3.
+
 ## [0.3.2] - 2026-08-10
 
 ### Added

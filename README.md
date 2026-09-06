@@ -117,10 +117,16 @@ for await (const vault of iterateVaultsByOwner(factory, "G...", { pageSize: 50 }
 }
 ```
 
-Both are guaranteed to terminate: they stop at the first page shorter
-than `pageSize`, and throw (rather than loop forever) if `maxPages`
-(default 1000) is hit without that ever happening — protection against a
-misbehaving contract that always returns full pages.
+Both are guaranteed to terminate. Against a factory that exposes
+`vaults_by_owner_count` (any `connectFactory` client does), they read the
+total once and stop at exactly that many vaults. Against an older factory
+or a hand-rolled reader without it, they fall back to stopping at the
+first page shorter than `pageSize`, and throw (rather than loop forever)
+if `maxPages` (default 1000) is hit without that ever happening —
+protection against a misbehaving contract that always returns full pages.
+
+`factory.vaults_by_owner_count({ owner })` is also usable directly when
+you just want the number.
 
 ### Errors
 
