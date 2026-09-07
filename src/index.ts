@@ -8,6 +8,7 @@ export type {
 
 export {
   connectFactory,
+  deployVaultViaFactory,
   iterateVaultsByOwner,
   collectVaultsByOwner,
 } from "./factoryClient.js";
@@ -15,6 +16,9 @@ export type {
   FactoryClient,
   FactoryMethods,
   VaultsByOwnerReader,
+  VaultDeployer,
+  DeployVaultViaFactoryArgs,
+  DeployVaultViaFactoryOptions,
   PaginationOptions,
 } from "./factoryClient.js";
 

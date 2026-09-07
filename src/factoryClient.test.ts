@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   iterateVaultsByOwner,
   collectVaultsByOwner,
+  deployVaultViaFactory,
   type VaultsByOwnerReader,
+  type VaultDeployer,
 } from "./factoryClient.js";
+import { ownerNonceSalt } from "./salt.js";
 
 function fakeReader(pages: string[][]): VaultsByOwnerReader {
   return {
@@ -181,5 +184,91 @@ describe("iterateVaultsByOwner / collectVaultsByOwner", () => {
       { offset: 0, limit: 2 },
       { offset: 2, limit: 2 },
     ]);
+  });
+});
+
+describe("deployVaultViaFactory", () => {
+  const OWNER = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+  const TOKEN = "CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526";
+
+  function recordingDeployer() {
+    const calls: Array<Parameters<VaultDeployer["deploy_vault"]>[0]> = [];
+    const factory: VaultDeployer = {
+      async deploy_vault(args) {
+        calls.push(args);
+        return { result: "CDEPLOYEDVAULTADDRESS" } as never;
+      },
+    };
+    return { factory, calls };
+  }
+
+  it("passes args through and generates a 32-byte random salt by default", async () => {
+    const { factory, calls } = recordingDeployer();
+    const tx = await deployVaultViaFactory(factory, {
+      owner: OWNER,
+      token: TOKEN,
+      min_deposit: 100n,
+    });
+    expect(tx.result).toBe("CDEPLOYEDVAULTADDRESS");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      owner: OWNER,
+      token: TOKEN,
+      min_deposit: 100n,
+      max_balance: undefined,
+    });
+    expect(calls[0].salt).toHaveLength(32);
+  });
+
+  it("two default deploys get different salts", async () => {
+    const { factory, calls } = recordingDeployer();
+    await deployVaultViaFactory(factory, { owner: OWNER, token: TOKEN, min_deposit: 0n });
+    await deployVaultViaFactory(factory, { owner: OWNER, token: TOKEN, min_deposit: 0n });
+    expect(Buffer.compare(calls[0].salt, calls[1].salt)).not.toBe(0);
+  });
+
+  it("{ nonce } derives the same salt as ownerNonceSalt(owner, nonce)", async () => {
+    const { factory, calls } = recordingDeployer();
+    await deployVaultViaFactory(
+      factory,
+      { owner: OWNER, token: TOKEN, min_deposit: 0n },
+      { salt: { nonce: 7 } },
+    );
+    const expected = await ownerNonceSalt(OWNER, 7);
+    expect(Buffer.compare(calls[0].salt, expected)).toBe(0);
+  });
+
+  it("accepts an explicit 32-byte salt and forwards max_balance", async () => {
+    const { factory, calls } = recordingDeployer();
+    const salt = Buffer.alloc(32, 9);
+    await deployVaultViaFactory(
+      factory,
+      { owner: OWNER, token: TOKEN, min_deposit: 0n, max_balance: 5_000n },
+      { salt },
+    );
+    expect(Buffer.compare(calls[0].salt, salt)).toBe(0);
+    expect(calls[0].max_balance).toBe(5_000n);
+  });
+
+  it("rejects a wrong-length explicit salt", async () => {
+    const { factory } = recordingDeployer();
+    await expect(
+      deployVaultViaFactory(
+        factory,
+        { owner: OWNER, token: TOKEN, min_deposit: 0n },
+        { salt: Buffer.alloc(16) },
+      ),
+    ).rejects.toThrow(/salt must be 32 bytes/);
+  });
+
+  it("rejects an invalid nonce (via ownerNonceSalt)", async () => {
+    const { factory } = recordingDeployer();
+    await expect(
+      deployVaultViaFactory(
+        factory,
+        { owner: OWNER, token: TOKEN, min_deposit: 0n },
+        { salt: { nonce: -1 } },
+      ),
+    ).rejects.toThrow(/safe integer/);
   });
 });

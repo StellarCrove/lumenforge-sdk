@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.0] - 2026-09-07
+
+### Added
+
+- `deployVaultViaFactory(factory, args, options?)` — deploy a vault
+  *through the factory* (so it lands in the on-chain per-owner index),
+  with salt derivation handled: `{ salt: Buffer }`, `{ salt: { nonce } }`
+  (deterministic via `ownerNonceSalt`), or omit for a random salt.
+  Rejects a wrong-length explicit salt. Complements `deployVault`, which
+  deploys a standalone instance.
+- `VaultMethods.cancel_pending_owner()` — mirrors the new contract method
+  (`lumen_vault` v0.4.0): the owner withdraws a `propose_owner` proposal
+  before it's accepted.
+
+### Changed
+
+- Regenerated `test/fixtures/lumen_vault.wasm` against `lumen_vault`
+  v0.4.0 (`cancel_pending_owner` + `new_balance` in `Deposit`/`Withdraw`
+  events — the SDK doesn't decode event bodies, so no type change beyond
+  the new method).
+
 ## [0.4.0] - 2026-09-06
 
 ### Added

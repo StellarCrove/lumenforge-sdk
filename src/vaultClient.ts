@@ -38,6 +38,10 @@ export interface VaultMethods {
     args: { new_owner: string },
     options?: MethodOptions,
   ): Promise<AssembledTransaction<null>>;
+  /** Owner-only. Rejects with `NoPendingOwner` if nothing is pending. */
+  cancel_pending_owner(
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<null>>;
   accept_owner(options?: MethodOptions): Promise<AssembledTransaction<null>>;
   balance(options?: MethodOptions): Promise<AssembledTransaction<bigint>>;
   owner(options?: MethodOptions): Promise<AssembledTransaction<string>>;

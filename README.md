@@ -88,9 +88,31 @@ const tx = await factory.deploy_vault({
 const { result: vaultAddress } = await tx.signAndSend();
 ```
 
-Use `ownerNonceSalt(owner, nonce)` instead of `randomSalt()` if you want
-a deterministic, reproducible vault address for a given
-`(owner, nonce)` pair.
+Or let `deployVaultViaFactory` handle the salt for you:
+
+```ts
+import { deployVaultViaFactory } from "@lumenforge/sdk";
+
+// random salt (default)
+const tx = await deployVaultViaFactory(factory, {
+  owner: "G...",
+  token: "C...",
+  min_deposit: 0n,
+});
+
+// deterministic: same (owner, nonce) → same vault address
+const tx2 = await deployVaultViaFactory(
+  factory,
+  { owner: "G...", token: "C...", min_deposit: 0n },
+  { salt: { nonce: 0 } },
+);
+
+const { result: vaultAddress } = await tx.signAndSend();
+```
+
+Use `ownerNonceSalt(owner, nonce)` (or `{ salt: { nonce } }` above)
+instead of `randomSalt()` if you want a deterministic, reproducible vault
+address for a given `(owner, nonce)` pair.
 
 `vaults_by_owner` is paginated — pass `offset`/`limit` rather than
 assuming an owner has few vaults:
