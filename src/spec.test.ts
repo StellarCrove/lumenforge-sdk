@@ -43,6 +43,7 @@ describe("lumen_vault spec", () => {
       "set_max_balance",
       "rescue",
       "propose_owner",
+      "cancel_pending_owner",
       "accept_owner",
       "balance",
       "owner",

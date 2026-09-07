@@ -5,6 +5,7 @@ import {
   type MethodOptions,
 } from "@stellar/stellar-sdk/contract";
 import { FACTORY_ERROR_TYPES } from "./errors.js";
+import { ownerNonceSalt, randomSalt } from "./salt.js";
 
 /**
  * Typed method surface for a deployed `lumen_vault_factory` contract.
@@ -56,6 +57,81 @@ export function connectFactory(
     ...options,
     errorTypes: FACTORY_ERROR_TYPES,
   });
+}
+
+export interface DeployVaultViaFactoryArgs {
+  owner: string;
+  token: string;
+  min_deposit: bigint;
+  max_balance?: bigint;
+}
+
+export interface DeployVaultViaFactoryOptions extends MethodOptions {
+  /**
+   * How to derive the 32-byte deployment salt. Soroban addresses the new
+   * vault from `(factory, salt, wasmHash)`, so it must be unique per
+   * `(factory, owner)` — reusing one fails on the second deploy.
+   *
+   * - a 32-byte `Buffer`/`Uint8Array` — used as-is
+   * - `{ nonce }` — deterministic: `ownerNonceSalt(owner, nonce)`, so the
+   *   same `(owner, nonce)` always resolves to the same vault address
+   * - omitted — a fresh random salt (`randomSalt()`)
+   */
+  salt?: Buffer | Uint8Array | { nonce: number };
+}
+
+/** The one method `deployVaultViaFactory` calls. */
+export interface VaultDeployer {
+  deploy_vault(
+    args: {
+      owner: string;
+      token: string;
+      min_deposit: bigint;
+      max_balance: bigint | undefined;
+      salt: Buffer;
+    },
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<string>>;
+}
+
+/**
+ * Deploys a `lumen_vault` **through the factory** (so it lands in the
+ * factory's per-owner index — unlike {@link deployVault}, which deploys a
+ * standalone instance). Handles salt derivation; you still call
+ * `.signAndSend()` on the returned transaction, after which `.result` is
+ * the new vault's contract-address string.
+ */
+export async function deployVaultViaFactory(
+  factory: VaultDeployer,
+  args: DeployVaultViaFactoryArgs,
+  options: DeployVaultViaFactoryOptions = {},
+): Promise<AssembledTransaction<string>> {
+  const { salt: saltOpt, ...methodOptions } = options;
+
+  let salt: Buffer;
+  if (saltOpt == null) {
+    salt = randomSalt();
+  } else if (saltOpt instanceof Uint8Array) {
+    if (saltOpt.length !== 32) {
+      throw new Error(
+        `deployVaultViaFactory: salt must be 32 bytes, got ${saltOpt.length}`,
+      );
+    }
+    salt = Buffer.from(saltOpt);
+  } else {
+    salt = await ownerNonceSalt(args.owner, saltOpt.nonce);
+  }
+
+  return factory.deploy_vault(
+    {
+      owner: args.owner,
+      token: args.token,
+      min_deposit: args.min_deposit,
+      max_balance: args.max_balance,
+      salt,
+    },
+    methodOptions,
+  );
 }
 
 /** The minimal capability `iterateVaultsByOwner` actually needs. */
