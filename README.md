@@ -182,6 +182,38 @@ const tx2 = await extendVaultsByOwnerTtl(factory, "G...");
 await tx2.signAndSend(); // rejects with NoVaultsForOwner if this owner has none
 ```
 
+### Decoding events
+
+Neither `VaultClient` nor `FactoryClient` decodes event bodies — a call
+just gives you the return value. To read what a vault or factory
+actually *did* (for an indexer, an activity feed, etc.), decode the raw
+events yourself with `decodeVaultEvent`/`decodeFactoryEvent`:
+
+```ts
+import { decodeVaultEvent } from "@lumenforge/sdk";
+
+const { events } = await server.getEvents({
+  filters: [{ type: "contract", contractIds: [vaultContractId] }],
+  startLedger,
+});
+
+for (const raw of events) {
+  const decoded = decodeVaultEvent(raw); // undefined if it's not one of ours
+  if (decoded?.type === "deposit") {
+    console.log(decoded.from, decoded.amount, decoded.new_balance);
+  }
+}
+```
+
+Returns `undefined` (never throws) for anything that isn't a known
+`lumen_vault`/`lumen_vault_factory` event — including the SEP-41 token's
+own `transfer` event, which shows up alongside `deposit`/`withdraw`/
+`rescue` since those call the token internally. See `src/events.ts` for
+the full `VaultEvent`/`FactoryEvent` union (one variant per contract
+event: `deposit`, `withdraw`, `paused`, `resumed`, `owner_proposed`,
+`owner_proposal_cancelled`, `owner_transferred`, `min_deposit_updated`,
+`max_balance_updated`, `rescued`, `vault_deployed`).
+
 ### Errors
 
 Both `connectVault` and `connectFactory` (and `deployVault`) wire up
