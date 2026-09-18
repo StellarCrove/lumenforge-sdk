@@ -11,6 +11,8 @@ export {
   deployVaultViaFactory,
   iterateVaultsByOwner,
   collectVaultsByOwner,
+  iterateVaultSnapshotsByOwner,
+  collectVaultSnapshotsByOwner,
 } from "./factoryClient.js";
 export type {
   FactoryClient,
@@ -20,6 +22,7 @@ export type {
   DeployVaultViaFactoryArgs,
   DeployVaultViaFactoryOptions,
   PaginationOptions,
+  VaultWithSnapshot,
 } from "./factoryClient.js";
 
 export { randomSalt, ownerNonceSalt } from "./salt.js";

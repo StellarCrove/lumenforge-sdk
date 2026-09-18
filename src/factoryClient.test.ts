@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   iterateVaultsByOwner,
   collectVaultsByOwner,
+  collectVaultSnapshotsByOwner,
   deployVaultViaFactory,
   type VaultsByOwnerReader,
   type VaultDeployer,
 } from "./factoryClient.js";
 import { ownerNonceSalt } from "./salt.js";
+import type { VaultReader } from "./snapshot.js";
 
 function fakeReader(pages: string[][]): VaultsByOwnerReader {
   return {
@@ -270,5 +272,69 @@ describe("deployVaultViaFactory", () => {
         { salt: { nonce: -1 } },
       ),
     ).rejects.toThrow(/safe integer/);
+  });
+});
+
+describe("collectVaultSnapshotsByOwner", () => {
+  const OWNER = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+
+  function fakeVaultReader(address: string, balance: bigint): VaultReader {
+    return {
+      balance: async () => ({ result: balance }),
+      owner: async () => ({ result: OWNER }),
+      pending_owner: async () => ({ result: undefined }),
+      token: async () => ({ result: `token-of-${address}` }),
+      min_deposit: async () => ({ result: 0n }),
+      max_balance: async () => ({ result: undefined }),
+      paused: async () => ({ result: false }),
+    };
+  }
+
+  it("resolves each address to its full snapshot, in order", async () => {
+    const reader = fakeReader([["v1", "v2"]]);
+    const connected: string[] = [];
+    const connect = async (address: string) => {
+      connected.push(address);
+      return fakeVaultReader(address, address === "v1" ? 100n : 200n);
+    };
+
+    const results = await collectVaultSnapshotsByOwner(
+      reader,
+      OWNER,
+      connect,
+      { pageSize: 5 },
+    );
+
+    expect(connected).toEqual(["v1", "v2"]);
+    expect(results).toEqual([
+      { address: "v1", balance: 100n, owner: OWNER, pendingOwner: undefined, token: "token-of-v1", minDeposit: 0n, maxBalance: undefined, paused: false },
+      { address: "v2", balance: 200n, owner: OWNER, pendingOwner: undefined, token: "token-of-v2", minDeposit: 0n, maxBalance: undefined, paused: false },
+    ]);
+  });
+
+  it("connects vaults one at a time, not concurrently", async () => {
+    const reader = fakeReader([["v1", "v2"]]);
+    const order: string[] = [];
+    const connect = async (address: string) => {
+      order.push(`connect:${address}`);
+      return fakeVaultReader(address, 1n);
+    };
+
+    await collectVaultSnapshotsByOwner(reader, OWNER, connect, {
+      pageSize: 5,
+    });
+
+    expect(order).toEqual(["connect:v1", "connect:v2"]);
+  });
+
+  it("returns an empty array for an owner with no vaults", async () => {
+    const reader = fakeReader([[]]);
+    const results = await collectVaultSnapshotsByOwner(
+      reader,
+      OWNER,
+      async (address) => fakeVaultReader(address, 0n),
+      { pageSize: 5 },
+    );
+    expect(results).toEqual([]);
   });
 });

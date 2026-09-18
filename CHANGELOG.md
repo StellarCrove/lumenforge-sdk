@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.10.0] - 2026-09-18
+
+### Added
+
+- `iterateVaultSnapshotsByOwner`/`collectVaultSnapshotsByOwner` — like
+  `iterateVaultsByOwner`/`collectVaultsByOwner`, but resolve each address
+  into its full `getVaultSnapshot` instead of leaving that to the
+  caller. Takes a `connect` callback (address → `VaultReader`) since only
+  the caller has the RPC/network options to connect with. Vaults are
+  connected and read sequentially, not in parallel, to keep the request
+  rate against the RPC endpoint predictable.
+
 ## [0.9.0] - 2026-09-18
 
 ### Added

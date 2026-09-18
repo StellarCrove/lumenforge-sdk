@@ -6,6 +6,7 @@ import {
 } from "@stellar/stellar-sdk/contract";
 import { FACTORY_ERROR_TYPES } from "./errors.js";
 import { ownerNonceSalt, randomSalt } from "./salt.js";
+import { getVaultSnapshot, type VaultReader, type VaultSnapshot } from "./snapshot.js";
 
 /**
  * Typed method surface for a deployed `lumen_vault_factory` contract.
@@ -249,4 +250,53 @@ export async function collectVaultsByOwner(
     vaults.push(vault);
   }
   return vaults;
+}
+
+/** One page of `vaults_by_owner`, resolved into full vault state. */
+export type VaultWithSnapshot = VaultSnapshot & { address: string };
+
+/**
+ * Pages through every vault for `owner` like {@link iterateVaultsByOwner},
+ * but yields each one's full state instead of just its address — `connect`
+ * turns an address into a readable client (typically `connectVault` with
+ * whatever RPC/network options are already in scope; this doesn't assume
+ * any of that, since only the caller has it).
+ *
+ * `connect` calls are **not** parallelized across the page — each vault
+ * is connected and read before moving to the next — so a page of N
+ * vaults costs N sequential round trips, same as calling
+ * {@link getVaultSnapshot} yourself in a loop. This trades speed for a
+ * bounded, predictable request rate against the RPC endpoint; batch your
+ * own concurrency on top if you need it and know your endpoint can take it.
+ */
+export async function* iterateVaultSnapshotsByOwner(
+  factory: VaultsByOwnerReader,
+  owner: string,
+  connect: (address: string) => Promise<VaultReader>,
+  options: PaginationOptions = {},
+): AsyncGenerator<VaultWithSnapshot, void, void> {
+  for await (const address of iterateVaultsByOwner(factory, owner, options)) {
+    const vault = await connect(address);
+    const snapshot = await getVaultSnapshot(vault);
+    yield { address, ...snapshot };
+  }
+}
+
+/** Convenience wrapper around `iterateVaultSnapshotsByOwner` that collects every result. */
+export async function collectVaultSnapshotsByOwner(
+  factory: VaultsByOwnerReader,
+  owner: string,
+  connect: (address: string) => Promise<VaultReader>,
+  options: PaginationOptions = {},
+): Promise<VaultWithSnapshot[]> {
+  const results: VaultWithSnapshot[] = [];
+  for await (const result of iterateVaultSnapshotsByOwner(
+    factory,
+    owner,
+    connect,
+    options,
+  )) {
+    results.push(result);
+  }
+  return results;
 }
