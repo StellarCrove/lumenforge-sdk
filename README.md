@@ -150,6 +150,38 @@ protection against a misbehaving contract that always returns full pages.
 `factory.vaults_by_owner_count({ owner })` is also usable directly when
 you just want the number.
 
+### Keeping contracts alive (TTL)
+
+Neither contract can renew its own storage TTL — Soroban contracts can't
+self-trigger — so something off-chain has to call `extend_ttl`
+periodically, or the network archives the storage once its TTL expires.
+`keepAlive` is that off-chain half, meant to be run from a cron job (or
+any scheduler) against every vault/factory you want to keep alive:
+
+```ts
+import { keepAlive } from "@lumenforge/sdk";
+
+const results = await keepAlive([vault, factory]);
+// [{ target: vault, status: "ok" }, { target: factory, status: "ok" }]
+```
+
+One target failing doesn't stop the others — each result is reported
+independently, so a scheduled run can retry only what failed. Defaults
+extend to ~30 days out once within ~1 day of expiring; override with
+`{ threshold, extendTo }` (in ledgers). For a single target, or for a
+factory's per-owner `VaultsByOwner` entry (which has its own, separate
+TTL), use `extendTtl`/`extendVaultsByOwnerTtl` directly:
+
+```ts
+import { extendTtl, extendVaultsByOwnerTtl } from "@lumenforge/sdk";
+
+const tx = await extendTtl(vault);
+await tx.signAndSend();
+
+const tx2 = await extendVaultsByOwnerTtl(factory, "G...");
+await tx2.signAndSend(); // rejects with NoVaultsForOwner if this owner has none
+```
+
 ### Errors
 
 Both `connectVault` and `connectFactory` (and `deployVault`) wire up
