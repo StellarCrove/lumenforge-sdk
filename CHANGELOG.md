@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.13.1] - 2026-09-18
+
+### Fixed
+
+- CLI: `--start-ledger`/`--threshold`/`--extend-to`/`--nonce` silently
+  became `NaN` on non-numeric input instead of failing cleanly (e.g. an
+  unvalidated `--start-ledger` reaching `getEvents` as `NaN`).
+- CLI: bad `--amount`/`--min-deposit`/`--max-balance` (non-integer, e.g.
+  `10.5`) raised a raw `SyntaxError` from `BigInt()` instead of a
+  `lumenforge: ...` message.
+- CLI: malformed arguments Node's `parseArgs` itself rejects — a
+  negative number as a flag's value (`--start-ledger -5`, read as
+  "looks like another flag"; use `--start-ledger=-5`) or an unknown
+  flag — crashed with a raw uncaught-exception stack trace instead of a
+  clean error, because `parseArgs` runs at module load, before `main()`'s
+  try/catch exists to catch anything.
+- CLI: no way to point at an `http://` RPC endpoint (a local standalone
+  network) — every connect call rejected it outright. Now auto-detected
+  from the URL scheme (`allowHttp` is never inferred for `https://`).
+- CLI: `factory list-vaults --with-snapshots` derived the read-only
+  public key twice (harmless, but redundant); computed once now.
+
 ## [0.13.0] - 2026-09-18
 
 ### Added
