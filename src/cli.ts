@@ -11,8 +11,14 @@
  * `LUMENFORGE_SECRET_KEY` environment variable, never from a `--flag`
  * (a CLI flag is visible to anyone who can run `ps` on the host, and
  * lands in shell history).
+ *
+ * Everything below the arg-parsing helpers is exported so `cli.test.ts`
+ * can exercise it directly; only running this file itself (not just
+ * importing it) actually parses `process.argv` and executes a command —
+ * see the `isDirectRun` guard at the bottom.
  */
 import { parseArgs } from "node:util";
+import { pathToFileURL } from "node:url";
 import { Keypair, rpc } from "@stellar/stellar-sdk";
 import { KeypairSigner } from "@stellar/stellar-sdk/contract";
 import { connectFactory, deployVaultViaFactory, collectVaultsByOwner, collectVaultSnapshotsByOwner, keepOwnerVaultsAlive } from "./factoryClient.js";
@@ -21,12 +27,14 @@ import { extendTtl } from "./keeper.js";
 import { connectVault } from "./vaultClient.js";
 import { getFactorySnapshot, getVaultSnapshot } from "./snapshot.js";
 
-function fail(message: string): never {
-  console.error(`lumenforge: ${message}`);
-  process.exit(1);
+/** Thrown by {@link fail} for any user-facing CLI error — caught once, at the bottom, and turned into a clean exit. */
+export class CliError extends Error {}
+
+export function fail(message: string): never {
+  throw new CliError(message);
 }
 
-function requireEnv(name: string): string {
+export function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) fail(`missing required environment variable ${name}`);
   return v;
@@ -38,7 +46,7 @@ function print(value: unknown): void {
   );
 }
 
-interface Network {
+export interface Network {
   rpcUrl: string;
   networkPassphrase: string;
   /**
@@ -50,7 +58,7 @@ interface Network {
   allowHttp: boolean;
 }
 
-function getNetwork(): Network {
+export function getNetwork(): Network {
   const rpcUrl = requireEnv("LUMENFORGE_RPC_URL");
   return {
     rpcUrl,
@@ -60,7 +68,7 @@ function getNetwork(): Network {
 }
 
 /** For a state-changing call: a signer derived from `LUMENFORGE_SECRET_KEY`. */
-function getSigner(networkPassphrase: string): KeypairSigner {
+export function getSigner(networkPassphrase: string): KeypairSigner {
   const secret = requireEnv("LUMENFORGE_SECRET_KEY");
   return new KeypairSigner(Keypair.fromSecret(secret), networkPassphrase);
 }
@@ -70,15 +78,15 @@ function getSigner(networkPassphrase: string): KeypairSigner {
  * `--public-key` if given, else derives one from `LUMENFORGE_SECRET_KEY`
  * if that's set — either way, nothing is signed for a read.
  */
-function getReadOnlyPublicKey(explicit: string | undefined): string {
+export function getReadOnlyPublicKey(explicit: string | undefined): string {
   if (explicit) return explicit;
   const secret = process.env.LUMENFORGE_SECRET_KEY;
   if (secret) return Keypair.fromSecret(secret).publicKey();
   fail("pass --public-key, or set LUMENFORGE_SECRET_KEY, for a source account to simulate against");
 }
 
-// `parseArgs` throws synchronously — before `main()`'s try/catch exists to
-// catch anything — on malformed input it doesn't just reject with a normal
+// `parseArgs` throws synchronously — before anything downstream exists to
+// catch it — on malformed input it doesn't just reject with a normal
 // value for, e.g. a negative number as an option's argument (`-5`) reads as
 // "looks like another flag" and throws `ERR_PARSE_ARGS_INVALID_OPTION_VALUE`.
 // Caught here so that surfaces as a clean `lumenforge: ...` message instead
@@ -111,8 +119,6 @@ function parseCliArgs() {
   }
 }
 
-const { values, positionals } = parseCliArgs();
-
 const USAGE = `lumenforge <resource> <action> [options]
 
 Environment (always required):
@@ -134,13 +140,13 @@ factory keep-owner-vaults-alive --contract <C...> --owner <G...> [--threshold <n
 events list       --contract <C...> --start-ledger <n> --kind vault|factory
 `;
 
-function requiredArg(name: string, value: string | undefined): string {
+export function requiredArg(name: string, value: string | undefined): string {
   if (value === undefined) fail(`missing required --${name}`);
   return value;
 }
 
 /** Parses `value` as a `bigint`, failing with a clean message instead of a raw `SyntaxError`. */
-function parseBigintArg(name: string, value: string): bigint {
+export function parseBigintArg(name: string, value: string): bigint {
   try {
     return BigInt(value);
   } catch {
@@ -148,16 +154,16 @@ function parseBigintArg(name: string, value: string): bigint {
   }
 }
 
-function requiredBigintArg(name: string, value: string | undefined): bigint {
+export function requiredBigintArg(name: string, value: string | undefined): bigint {
   return parseBigintArg(name, requiredArg(name, value));
 }
 
-function optionalBigint(name: string, value: string | undefined): bigint | undefined {
+export function optionalBigint(name: string, value: string | undefined): bigint | undefined {
   return value === undefined ? undefined : parseBigintArg(name, value);
 }
 
 /** Parses `value` as a non-negative integer `number` (e.g. a ledger sequence). */
-function requiredIntArg(name: string, value: string | undefined): number {
+export function requiredIntArg(name: string, value: string | undefined): number {
   const parsed = Number(requiredArg(name, value));
   if (!Number.isInteger(parsed) || parsed < 0) {
     fail(`--${name} must be a non-negative integer, got ${JSON.stringify(value)}`);
@@ -166,7 +172,7 @@ function requiredIntArg(name: string, value: string | undefined): number {
 }
 
 /** Parses an optional integer flag (e.g. `--threshold`), distinguishing "absent" from an explicit but empty value. */
-function optionalIntArg(name: string, value: string | undefined): number | undefined {
+export function optionalIntArg(name: string, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) {
@@ -175,11 +181,13 @@ function optionalIntArg(name: string, value: string | undefined): number | undef
   return parsed;
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
+  const { values, positionals } = parseCliArgs();
   const [resource, action] = positionals;
   if (values.help || !resource || !action) {
     console.log(USAGE);
-    process.exit(values.help ? 0 : 1);
+    process.exitCode = values.help ? 0 : 1;
+    return;
   }
 
   const net = getNetwork();
@@ -296,7 +304,18 @@ async function main(): Promise<void> {
   fail(`unknown command: ${resource} ${action}`);
 }
 
-main().catch((err: unknown) => {
-  console.error(`lumenforge: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+// Only parse `process.argv` and run a command when this file is executed
+// directly (as the CLI binary) — not when `cli.test.ts` imports it to
+// exercise the exported helpers. Without this guard, importing the module
+// for testing would immediately parse the test runner's own argv and
+// attempt to execute a command.
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectRun) {
+  main().catch((err: unknown) => {
+    console.error(`lumenforge: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
+  });
+}

@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.14.0] - 2026-09-18
+
+### Added
+
+- `src/cli.test.ts`: 26 tests covering the CLI's argument-parsing and
+  validation helpers directly (`requiredArg`, `requiredBigintArg`,
+  `requiredIntArg`, `optionalIntArg`, `getNetwork`'s `allowHttp`
+  detection, `getReadOnlyPublicKey`'s fallback order, `requireEnv`).
+  Previously verified only by manual smoke-testing the compiled binary
+  (disclosed as a gap in #10/#11); this replaces that with a real
+  regression suite for the logic, while keeping the manual smoke test
+  for the parts that need the real process (argv, env, exit codes) — now
+  also run in CI.
+- CI: a smoke-test step runs the compiled `dist/cli.js` directly
+  (`--help`, and confirms a non-zero exit with no arguments), catching
+  integration-level breakage — a bad relative import, the `isDirectRun`
+  guard misfiring — that the unit tests on exported helpers can't, since
+  those never invoke `main()`.
+
+### Changed
+
+- CLI internals refactored for testability: `fail()` now throws a
+  `CliError` instead of calling `process.exit` directly, and argv
+  parsing moved from module load time into `main()`. Together these mean
+  importing `cli.ts` (e.g. from a test file) no longer has the side
+  effect of parsing the importer's own `process.argv` or attempting to
+  run a command — gated behind an `isDirectRun` check
+  (`import.meta.url` vs. `process.argv[1]`) at the bottom of the file.
+  No behavior change for actually running the CLI.
+
 ## [0.13.1] - 2026-09-18
 
 ### Fixed
