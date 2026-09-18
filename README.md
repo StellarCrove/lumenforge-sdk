@@ -259,6 +259,15 @@ for (const raw of events) {
 }
 ```
 
+Or decode the whole batch at once with `decodeVaultEvents`/`decodeFactoryEvents`,
+which drop anything unrecognized instead of you filtering `undefined`s:
+
+```ts
+import { decodeVaultEvents } from "@lumenforge/sdk";
+
+const deposits = decodeVaultEvents(events).filter((e) => e.type === "deposit");
+```
+
 Returns `undefined` (never throws) for anything that isn't a known
 `lumen_vault`/`lumen_vault_factory` event — including the SEP-41 token's
 own `transfer` event, which shows up alongside `deposit`/`withdraw`/

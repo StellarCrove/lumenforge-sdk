@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.12.0] - 2026-09-18
+
+### Added
+
+- `decodeVaultEvents(events)` / `decodeFactoryEvents(events)` — batch
+  versions of `decodeVaultEvent`/`decodeFactoryEvent` that decode a
+  whole `getEvents` result and drop anything unrecognized, instead of
+  every caller writing `events.map(decode).filter(...)` by hand.
+
 ## [0.11.0] - 2026-09-18
 
 ### Added

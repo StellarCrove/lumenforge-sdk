@@ -2,7 +2,9 @@ import { Keypair, nativeToScVal, xdr } from "@stellar/stellar-sdk";
 import { describe, expect, it } from "vitest";
 import {
   decodeFactoryEvent,
+  decodeFactoryEvents,
   decodeVaultEvent,
+  decodeVaultEvents,
   type RawContractEvent,
 } from "./events.js";
 
@@ -184,5 +186,39 @@ describe("decodeFactoryEvent", () => {
   it("returns undefined for a vault event passed to the factory decoder", () => {
     const e = event([symbol("deposit"), address(from)], dataMap({ amount: i128(1n), new_balance: i128(1n) }));
     expect(decodeFactoryEvent(e)).toBeUndefined();
+  });
+});
+
+describe("decodeVaultEvents / decodeFactoryEvents", () => {
+  it("decodes a batch, dropping anything unrecognized", () => {
+    const events = [
+      event([symbol("deposit"), address(from)], dataMap({ amount: i128(1n), new_balance: i128(1n) })),
+      event([symbol("transfer"), address(from), address(vault)], i128(1n)), // token's own event
+      event([symbol("withdraw"), address(owner)], dataMap({ amount: i128(2n), new_balance: i128(3n) })),
+    ];
+
+    const decoded = decodeVaultEvents(events);
+
+    expect(decoded).toEqual([
+      { type: "deposit", from, amount: 1n, new_balance: 1n },
+      { type: "withdraw", owner, amount: 2n, new_balance: 3n },
+    ]);
+  });
+
+  it("returns an empty array when nothing matches", () => {
+    const events = [
+      event([symbol("transfer"), address(from), address(vault)], i128(1n)),
+    ];
+    expect(decodeVaultEvents(events)).toEqual([]);
+    expect(decodeFactoryEvents(events)).toEqual([]);
+  });
+
+  it("decodeFactoryEvents decodes a batch of factory events", () => {
+    const events = [
+      event([symbol("vault_deployed"), address(owner)], dataMap({ vault: address(vault) })),
+    ];
+    expect(decodeFactoryEvents(events)).toEqual([
+      { type: "vault_deployed", owner, vault },
+    ]);
   });
 });
