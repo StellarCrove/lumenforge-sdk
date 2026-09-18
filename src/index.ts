@@ -25,3 +25,15 @@ export type {
 export { randomSalt, ownerNonceSalt } from "./salt.js";
 
 export { VAULT_ERROR_TYPES, FACTORY_ERROR_TYPES } from "./errors.js";
+
+export {
+  extendTtl,
+  extendVaultsByOwnerTtl,
+  keepAlive,
+} from "./keeper.js";
+export type {
+  TtlExtendable,
+  VaultsByOwnerTtlExtendable,
+  KeepAliveOptions,
+  KeepAliveResult,
+} from "./keeper.js";
