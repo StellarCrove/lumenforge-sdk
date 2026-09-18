@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.11.0] - 2026-09-18
+
+### Added
+
+- `keepOwnerVaultsAlive(factory, owner, connect, options?)` — discovers
+  every vault an owner has (via `iterateVaultsByOwner`) and extends each
+  one's TTL, the fleet-wide version of calling `extendTtl`/`keepAlive`
+  yourself once you have a list of addresses. One vault's failure
+  doesn't stop the rest. Does not also extend the factory's own
+  `VaultsByOwner(owner)` index entry — that's still a separate call to
+  `extendVaultsByOwnerTtl`, documented as a pairing in the README.
+
 ## [0.10.0] - 2026-09-18
 
 ### Added
