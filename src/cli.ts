@@ -41,12 +41,21 @@ function print(value: unknown): void {
 interface Network {
   rpcUrl: string;
   networkPassphrase: string;
+  /**
+   * Auto-detected from the URL scheme, not a separate flag: an `http://`
+   * RPC URL (a local standalone network, most likely) needs this or
+   * every connect call rejects it outright. `https://` never sets it —
+   * matches `rpc.Server`'s own "must be false in production" guidance.
+   */
+  allowHttp: boolean;
 }
 
 function getNetwork(): Network {
+  const rpcUrl = requireEnv("LUMENFORGE_RPC_URL");
   return {
-    rpcUrl: requireEnv("LUMENFORGE_RPC_URL"),
+    rpcUrl,
     networkPassphrase: requireEnv("LUMENFORGE_NETWORK_PASSPHRASE"),
+    allowHttp: rpcUrl.startsWith("http://"),
   };
 }
 
@@ -68,27 +77,41 @@ function getReadOnlyPublicKey(explicit: string | undefined): string {
   fail("pass --public-key, or set LUMENFORGE_SECRET_KEY, for a source account to simulate against");
 }
 
-const { values, positionals } = parseArgs({
-  args: process.argv.slice(2),
-  allowPositionals: true,
-  options: {
-    contract: { type: "string" },
-    owner: { type: "string" },
-    token: { type: "string" },
-    from: { type: "string" },
-    amount: { type: "string" },
-    "min-deposit": { type: "string" },
-    "max-balance": { type: "string" },
-    nonce: { type: "string" },
-    "public-key": { type: "string" },
-    threshold: { type: "string" },
-    "extend-to": { type: "string" },
-    "start-ledger": { type: "string" },
-    kind: { type: "string" },
-    "with-snapshots": { type: "boolean" },
-    help: { type: "boolean" },
-  },
-});
+// `parseArgs` throws synchronously — before `main()`'s try/catch exists to
+// catch anything — on malformed input it doesn't just reject with a normal
+// value for, e.g. a negative number as an option's argument (`-5`) reads as
+// "looks like another flag" and throws `ERR_PARSE_ARGS_INVALID_OPTION_VALUE`.
+// Caught here so that surfaces as a clean `lumenforge: ...` message instead
+// of a raw stack trace; use `--flag=-5` to pass a literal negative value.
+function parseCliArgs() {
+  try {
+    return parseArgs({
+      args: process.argv.slice(2),
+      allowPositionals: true,
+      options: {
+        contract: { type: "string" },
+        owner: { type: "string" },
+        token: { type: "string" },
+        from: { type: "string" },
+        amount: { type: "string" },
+        "min-deposit": { type: "string" },
+        "max-balance": { type: "string" },
+        nonce: { type: "string" },
+        "public-key": { type: "string" },
+        threshold: { type: "string" },
+        "extend-to": { type: "string" },
+        "start-ledger": { type: "string" },
+        kind: { type: "string" },
+        "with-snapshots": { type: "boolean" },
+        help: { type: "boolean" },
+      },
+    });
+  } catch (err) {
+    fail(`invalid arguments: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+const { values, positionals } = parseCliArgs();
 
 const USAGE = `lumenforge <resource> <action> [options]
 
@@ -116,12 +139,40 @@ function requiredArg(name: string, value: string | undefined): string {
   return value;
 }
 
-function requiredBigintArg(name: string, value: string | undefined): bigint {
-  return BigInt(requiredArg(name, value));
+/** Parses `value` as a `bigint`, failing with a clean message instead of a raw `SyntaxError`. */
+function parseBigintArg(name: string, value: string): bigint {
+  try {
+    return BigInt(value);
+  } catch {
+    fail(`--${name} must be an integer, got ${JSON.stringify(value)}`);
+  }
 }
 
-function optionalBigint(value: string | undefined): bigint | undefined {
-  return value === undefined ? undefined : BigInt(value);
+function requiredBigintArg(name: string, value: string | undefined): bigint {
+  return parseBigintArg(name, requiredArg(name, value));
+}
+
+function optionalBigint(name: string, value: string | undefined): bigint | undefined {
+  return value === undefined ? undefined : parseBigintArg(name, value);
+}
+
+/** Parses `value` as a non-negative integer `number` (e.g. a ledger sequence). */
+function requiredIntArg(name: string, value: string | undefined): number {
+  const parsed = Number(requiredArg(name, value));
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    fail(`--${name} must be a non-negative integer, got ${JSON.stringify(value)}`);
+  }
+  return parsed;
+}
+
+/** Parses an optional integer flag (e.g. `--threshold`), distinguishing "absent" from an explicit but empty value. */
+function optionalIntArg(name: string, value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    fail(`--${name} must be an integer, got ${JSON.stringify(value)}`);
+  }
+  return parsed;
 }
 
 async function main(): Promise<void> {
@@ -162,8 +213,8 @@ async function main(): Promise<void> {
     if (action === "keep-alive") {
       const signer = getSigner(net.networkPassphrase);
       const vault = await connectVault({ contractId, ...net, publicKey: signer.address, signTransaction: signer });
-      const threshold = values.threshold ? Number(values.threshold) : undefined;
-      const extendTo = values["extend-to"] ? Number(values["extend-to"]) : undefined;
+      const threshold = optionalIntArg("threshold", values.threshold);
+      const extendTo = optionalIntArg("extend-to", values["extend-to"]);
       const tx = await extendTtl(vault, { threshold, extendTo });
       return print(await tx.signAndSend());
     }
@@ -184,10 +235,11 @@ async function main(): Promise<void> {
       const owner = requiredArg("owner", values.owner);
       const token = requiredArg("token", values.token);
       const minDeposit = requiredBigintArg("min-deposit", values["min-deposit"]);
-      const maxBalance = optionalBigint(values["max-balance"]);
+      const maxBalance = optionalBigint("max-balance", values["max-balance"]);
       const signer = getSigner(net.networkPassphrase);
       const factory = await connectFactory({ contractId, ...net, publicKey: signer.address, signTransaction: signer });
-      const salt = values.nonce ? { nonce: Number(values.nonce) } : undefined;
+      const nonce = optionalIntArg("nonce", values.nonce);
+      const salt = nonce !== undefined ? { nonce } : undefined;
       const tx = await deployVaultViaFactory(
         factory,
         { owner, token, min_deposit: minDeposit, max_balance: maxBalance },
@@ -198,9 +250,9 @@ async function main(): Promise<void> {
 
     if (action === "list-vaults") {
       const owner = requiredArg("owner", values.owner);
-      const factory = await connectFactory({ contractId, ...net, publicKey: getReadOnlyPublicKey(values["public-key"]) });
+      const publicKey = getReadOnlyPublicKey(values["public-key"]);
+      const factory = await connectFactory({ contractId, ...net, publicKey });
       if (values["with-snapshots"]) {
-        const publicKey = getReadOnlyPublicKey(values["public-key"]);
         const results = await collectVaultSnapshotsByOwner(factory, owner, (address) =>
           connectVault({ contractId: address, ...net, publicKey }),
         );
@@ -213,8 +265,8 @@ async function main(): Promise<void> {
       const owner = requiredArg("owner", values.owner);
       const signer = getSigner(net.networkPassphrase);
       const factory = await connectFactory({ contractId, ...net, publicKey: signer.address, signTransaction: signer });
-      const threshold = values.threshold ? Number(values.threshold) : undefined;
-      const extendTo = values["extend-to"] ? Number(values["extend-to"]) : undefined;
+      const threshold = optionalIntArg("threshold", values.threshold);
+      const extendTo = optionalIntArg("extend-to", values["extend-to"]);
       const results = await keepOwnerVaultsAlive(
         factory,
         owner,
@@ -229,11 +281,11 @@ async function main(): Promise<void> {
 
   if (resource === "events" && action === "list") {
     const contractId = requiredArg("contract", values.contract);
-    const startLedger = Number(requiredArg("start-ledger", values["start-ledger"]));
+    const startLedger = requiredIntArg("start-ledger", values["start-ledger"]);
     const kind = requiredArg("kind", values.kind);
     if (kind !== "vault" && kind !== "factory") fail("--kind must be \"vault\" or \"factory\"");
 
-    const server = new rpc.Server(net.rpcUrl);
+    const server = new rpc.Server(net.rpcUrl, { allowHttp: net.allowHttp });
     const { events } = await server.getEvents({
       filters: [{ type: "contract", contractIds: [contractId] }],
       startLedger,
