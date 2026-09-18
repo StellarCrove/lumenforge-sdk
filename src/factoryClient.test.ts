@@ -3,10 +3,12 @@ import {
   iterateVaultsByOwner,
   collectVaultsByOwner,
   collectVaultSnapshotsByOwner,
+  keepOwnerVaultsAlive,
   deployVaultViaFactory,
   type VaultsByOwnerReader,
   type VaultDeployer,
 } from "./factoryClient.js";
+import type { TtlExtendable } from "./keeper.js";
 import { ownerNonceSalt } from "./salt.js";
 import type { VaultReader } from "./snapshot.js";
 
@@ -333,6 +335,82 @@ describe("collectVaultSnapshotsByOwner", () => {
       reader,
       OWNER,
       async (address) => fakeVaultReader(address, 0n),
+      { pageSize: 5 },
+    );
+    expect(results).toEqual([]);
+  });
+});
+
+describe("keepOwnerVaultsAlive", () => {
+  const OWNER = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+
+  function fakeTtlTarget(
+    onExtend?: (args: { threshold: number; extend_to: number }) => void,
+  ): TtlExtendable {
+    return {
+      async extend_ttl(args) {
+        onExtend?.(args);
+        return { signAndSend: async () => ({ result: null }) } as never;
+      },
+    };
+  }
+
+  it("extends every discovered vault and reports success", async () => {
+    const reader = fakeReader([["v1", "v2"]]);
+    const connected: string[] = [];
+    const connect = async (address: string) => {
+      connected.push(address);
+      return fakeTtlTarget();
+    };
+
+    const results = await keepOwnerVaultsAlive(reader, OWNER, connect, {
+      pageSize: 5,
+    });
+
+    expect(connected).toEqual(["v1", "v2"]);
+    expect(results).toEqual([
+      { address: "v1", status: "ok" },
+      { address: "v2", status: "ok" },
+    ]);
+  });
+
+  it("isolates one vault's failure from the rest", async () => {
+    const reader = fakeReader([["v1", "v2", "v3"]]);
+    const connect = async (address: string) => {
+      if (address === "v2") {
+        throw new Error("connect failed");
+      }
+      return fakeTtlTarget();
+    };
+
+    const results = await keepOwnerVaultsAlive(reader, OWNER, connect, {
+      pageSize: 5,
+    });
+
+    expect(results.map((r) => r.status)).toEqual(["ok", "error", "ok"]);
+    expect(results[1].error).toBeInstanceOf(Error);
+  });
+
+  it("passes threshold/extendTo through to each extend_ttl call", async () => {
+    const reader = fakeReader([["v1"]]);
+    let seen: { threshold: number; extend_to: number } | undefined;
+    const connect = async () => fakeTtlTarget((args) => (seen = args));
+
+    await keepOwnerVaultsAlive(reader, OWNER, connect, {
+      pageSize: 5,
+      threshold: 100,
+      extendTo: 1000,
+    });
+
+    expect(seen).toEqual({ threshold: 100, extend_to: 1000 });
+  });
+
+  it("returns an empty array for an owner with no vaults", async () => {
+    const reader = fakeReader([[]]);
+    const results = await keepOwnerVaultsAlive(
+      reader,
+      OWNER,
+      async () => fakeTtlTarget(),
       { pageSize: 5 },
     );
     expect(results).toEqual([]);
