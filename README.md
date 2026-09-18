@@ -306,6 +306,46 @@ cp ../lumenforge-contracts/target/wasm32v1-none/release/lumen_vault.wasm test/fi
 cp ../lumenforge-contracts/target/wasm32v1-none/release/lumen_vault_factory.wasm test/fixtures/
 ```
 
+## CLI
+
+A thin command-line wrapper ships alongside the library, for scripting
+rather than building an app — a cron job that keeps vaults alive, a
+quick balance check, exercising a deployment without writing a script:
+
+```bash
+npm install -g @lumenforge/sdk   # or: npx @lumenforge/sdk ...
+export LUMENFORGE_RPC_URL="https://soroban-testnet.stellar.org"
+export LUMENFORGE_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+
+lumenforge vault snapshot --contract C... --public-key G...
+```
+
+**Not a wallet.** State-changing commands sign with a `Keypair` built
+from `LUMENFORGE_SECRET_KEY` — read **only** from that environment
+variable, never accepted as a `--flag` (a flag is visible to `ps` and
+lands in shell history). The secret lives in the process only for the
+duration of the command. Appropriate for a server-side script or a
+scheduled job you control; not for handling funds on behalf of anyone
+else.
+
+```bash
+export LUMENFORGE_SECRET_KEY="S..."
+
+lumenforge vault deposit --contract C... --from G... --amount 500
+lumenforge vault withdraw --contract C... --amount 200
+lumenforge vault keep-alive --contract C...
+
+lumenforge factory deploy-vault --contract C... --owner G... --token C... --min-deposit 0
+lumenforge factory list-vaults --contract C... --owner G... --with-snapshots
+lumenforge factory keep-owner-vaults-alive --contract C... --owner G...
+
+lumenforge events list --contract C... --start-ledger 123456 --kind vault
+```
+
+Run `lumenforge --help` for the full command list. This wraps a subset
+of the library's surface (the common scripting cases) — for anything
+else, use the library directly.
+
 ## Related
 
 - [`lumenforge-contracts`](https://github.com/StellarCrove/lumenforge-contracts)
