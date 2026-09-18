@@ -38,6 +38,14 @@ export type {
   KeepAliveResult,
 } from "./keeper.js";
 
+export { getVaultSnapshot, getFactorySnapshot } from "./snapshot.js";
+export type {
+  VaultSnapshot,
+  VaultReader,
+  FactorySnapshot,
+  FactoryReader,
+} from "./snapshot.js";
+
 export { decodeVaultEvent, decodeFactoryEvent } from "./events.js";
 export type {
   RawContractEvent,

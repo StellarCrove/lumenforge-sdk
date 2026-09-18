@@ -182,6 +182,22 @@ const tx2 = await extendVaultsByOwnerTtl(factory, "G...");
 await tx2.signAndSend(); // rejects with NoVaultsForOwner if this owner has none
 ```
 
+### Reading full state at once
+
+`balance()`, `owner()`, `token()`, `paused()`, etc. are each their own
+RPC round trip. For a dashboard or explorer that wants all of a vault's
+(or factory's) state, `getVaultSnapshot`/`getFactorySnapshot` fetch every
+field in parallel instead of you sequencing them:
+
+```ts
+import { getVaultSnapshot, getFactorySnapshot } from "@lumenforge/sdk";
+
+const { balance, owner, pendingOwner, token, minDeposit, maxBalance, paused } =
+  await getVaultSnapshot(vault);
+
+const { vaultCount, vaultWasmHash } = await getFactorySnapshot(factory);
+```
+
 ### Decoding events
 
 Neither `VaultClient` nor `FactoryClient` decodes event bodies — a call
