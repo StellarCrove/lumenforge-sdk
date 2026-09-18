@@ -19,3 +19,14 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+      - name: CLI smoke test
+        # Exercises the compiled bin as an actual executable — catches
+        # import/wiring breakage (bad relative import, missing shebang
+        # handling, the isDirectRun guard misfiring) that unit tests on
+        # the exported helpers wouldn't, since those never run main().
+        run: |
+          node dist/cli.js --help
+          if node dist/cli.js > /dev/null 2>&1; then
+            echo "expected non-zero exit with no arguments" >&2
+            exit 1
+          fi
