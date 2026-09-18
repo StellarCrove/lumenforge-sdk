@@ -203,6 +203,23 @@ const tx2 = await extendVaultsByOwnerTtl(factory, "G...");
 await tx2.signAndSend(); // rejects with NoVaultsForOwner if this owner has none
 ```
 
+Don't know an owner's vault addresses up front? `keepOwnerVaultsAlive`
+discovers them (via `iterateVaultsByOwner`) and extends each one, same
+per-target failure isolation as `keepAlive`:
+
+```ts
+import { keepOwnerVaultsAlive, extendVaultsByOwnerTtl } from "@lumenforge/sdk";
+
+const results = await keepOwnerVaultsAlive(factory, "G...", (address) =>
+  connectVault({ contractId: address, /* same rpcUrl/networkPassphrase/... */ }),
+);
+// [{ address: "C...", status: "ok" }, ...]
+
+// keepOwnerVaultsAlive only extends the vaults themselves — extend the
+// factory's own per-owner index entry alongside it if you want both:
+await (await extendVaultsByOwnerTtl(factory, "G...")).signAndSend();
+```
+
 ### Reading full state at once
 
 `balance()`, `owner()`, `token()`, `paused()`, etc. are each their own
