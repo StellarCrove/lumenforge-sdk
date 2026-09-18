@@ -150,6 +150,27 @@ protection against a misbehaving contract that always returns full pages.
 `factory.vaults_by_owner_count({ owner })` is also usable directly when
 you just want the number.
 
+Both only give you addresses — for "show me this owner's vaults, with
+balances," use `collectVaultSnapshotsByOwner`/`iterateVaultSnapshotsByOwner`
+instead, which resolve each address into a full `getVaultSnapshot`.
+`connect` is up to you (typically `connectVault` with whatever RPC/network
+options are already in scope) since only the caller has those:
+
+```ts
+import { collectVaultSnapshotsByOwner } from "@lumenforge/sdk";
+
+const vaults = await collectVaultSnapshotsByOwner(factory, "G...", (address) =>
+  connectVault({ contractId: address, /* same rpcUrl/networkPassphrase/... */ }),
+);
+// [{ address: "C...", balance: 500n, owner: "G...", paused: false, ... }, ...]
+```
+
+Vaults are connected and read one at a time, not in parallel — a page of
+N vaults costs N sequential round trips, same as looping
+`getVaultSnapshot` yourself. That trades speed for a predictable request
+rate against the RPC endpoint; add your own concurrency on top if your
+endpoint can take it.
+
 ### Keeping contracts alive (TTL)
 
 Neither contract can renew its own storage TTL — Soroban contracts can't
