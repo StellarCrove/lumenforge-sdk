@@ -37,3 +37,21 @@ export type {
   KeepAliveOptions,
   KeepAliveResult,
 } from "./keeper.js";
+
+export { decodeVaultEvent, decodeFactoryEvent } from "./events.js";
+export type {
+  RawContractEvent,
+  VaultEvent,
+  FactoryEvent,
+  DepositEvent,
+  WithdrawEvent,
+  PausedEvent,
+  ResumedEvent,
+  OwnerProposedEvent,
+  OwnerProposalCancelledEvent,
+  OwnerTransferredEvent,
+  MinDepositUpdatedEvent,
+  MaxBalanceUpdatedEvent,
+  RescuedEvent,
+  VaultDeployedEvent,
+} from "./events.js";
