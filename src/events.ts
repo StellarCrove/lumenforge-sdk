@@ -165,3 +165,24 @@ export function decodeFactoryEvent(
 ): FactoryEvent | undefined {
   return decode<FactoryEvent>(FACTORY_EVENT_SHAPES, event);
 }
+
+/**
+ * Decodes a batch of raw events (typically `getEvents`'s `events` array)
+ * into `VaultEvent`s, silently dropping anything that isn't one — the
+ * `events.map(decodeVaultEvent).filter(...)` most callers would otherwise
+ * write by hand.
+ */
+export function decodeVaultEvents(events: RawContractEvent[]): VaultEvent[] {
+  return events
+    .map(decodeVaultEvent)
+    .filter((e): e is VaultEvent => e !== undefined);
+}
+
+/** Batch version of {@link decodeFactoryEvent}; drops non-matching events. */
+export function decodeFactoryEvents(
+  events: RawContractEvent[],
+): FactoryEvent[] {
+  return events
+    .map(decodeFactoryEvent)
+    .filter((e): e is FactoryEvent => e !== undefined);
+}
