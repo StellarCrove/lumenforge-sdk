@@ -51,7 +51,12 @@ export type {
   FactoryReader,
 } from "./snapshot.js";
 
-export { decodeVaultEvent, decodeFactoryEvent } from "./events.js";
+export {
+  decodeVaultEvent,
+  decodeFactoryEvent,
+  decodeVaultEvents,
+  decodeFactoryEvents,
+} from "./events.js";
 export type {
   RawContractEvent,
   VaultEvent,
