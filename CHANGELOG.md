@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.0] - 2026-09-18
+
+### Added
+
+- `FACTORY_ERROR_TYPES` entry for code 4 (`TooManyVaultsForOwner`),
+  mirroring the new per-owner vault cap on `lumen_vault_factory`
+  v0.3.2's `deploy_vault` (`MAX_VAULTS_PER_OWNER`, 100).
+
+### Fixed
+
+- `VAULT_ERROR_TYPES[5]` (`NoPendingOwner`)'s message said "there is no
+  ownership transfer to accept", but the code is now also returned by
+  `cancel_pending_owner` — reworded to cover both.
+
+### Changed
+
+- Regenerated `test/fixtures/lumen_vault_factory.wasm` against
+  `lumen_vault_factory` v0.3.2.
+
 ## [0.5.0] - 2026-09-07
 
 ### Added
