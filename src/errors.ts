@@ -14,7 +14,8 @@ export const VAULT_ERROR_TYPES: Record<number, { message: string }> = {
     message: "Paused: the vault is paused and is not accepting deposits.",
   },
   5: {
-    message: "NoPendingOwner: there is no ownership transfer to accept.",
+    message:
+      "NoPendingOwner: there is no pending ownership transfer to accept or cancel.",
   },
   6: { message: "Overflow: deposit would overflow the balance." },
   7: {
@@ -39,5 +40,9 @@ export const FACTORY_ERROR_TYPES: Record<number, { message: string }> = {
   },
   3: {
     message: "CountOverflow: the factory's vault counter would exceed u32::MAX.",
+  },
+  4: {
+    message:
+      "TooManyVaultsForOwner: this owner has hit the per-owner vault cap for this factory.",
   },
 };
