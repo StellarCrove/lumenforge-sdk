@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.0] - 2026-09-18
+
+### Added
+
+- `keepAlive(targets, options?)`, `extendTtl(target, options?)`, and
+  `extendVaultsByOwnerTtl(factory, owner, options?)` — an off-chain
+  "keeper" for the TTL-extension mechanism both contracts already
+  expose. Neither contract can self-trigger a renewal, so this is meant
+  to be run from a cron job against every vault/factory that needs to
+  stay alive. `keepAlive` isolates one target's failure from the rest so
+  a scheduled run can retry just what failed. Addresses Known Limitation
+  #1 in `lumenforge-contracts`' `docs/security.md` ("no TTL/rent
+  *policy*, mechanism exists") — no contract-side change, since the
+  mechanism (`extend_ttl`/`extend_vaults_by_owner_ttl`) was already
+  there.
+
 ## [0.6.0] - 2026-09-18
 
 ### Added
