@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.8.0] - 2026-09-18
+
+### Added
+
+- `decodeVaultEvent(event)` / `decodeFactoryEvent(event)` — decode a raw
+  contract event (matching `rpc.Api.EventResponse`'s `{ topic, value }`
+  shape) into a typed `VaultEvent`/`FactoryEvent` union covering every
+  event either contract publishes (`deposit`, `withdraw`, `paused`,
+  `resumed`, `owner_proposed`, `owner_proposal_cancelled`,
+  `owner_transferred`, `min_deposit_updated`, `max_balance_updated`,
+  `rescued`, `vault_deployed`). Returns `undefined` for anything that
+  isn't a recognized event, rather than throwing — including the SEP-41
+  token's own `transfer` event, which appears alongside
+  `deposit`/`withdraw`/`rescue`. The exact wire shape (Map-format data
+  even for a single field, empty-map-not-void for zero data fields,
+  `Void`-in-map for `Option::None`) was verified against real event XDR
+  dumped from `lumenforge-contracts`' own tests, not assumed from the
+  `#[contractevent]` macro source alone.
+
+Previously flagged in 0.5.0's changelog ("the SDK doesn't decode event
+bodies") as a known gap.
+
 ## [0.7.0] - 2026-09-18
 
 ### Added
