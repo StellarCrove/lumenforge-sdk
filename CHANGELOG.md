@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.0] - 2026-09-18
+
+### Added
+
+- `getVaultSnapshot(vault)` / `getFactorySnapshot(factory)` — read every
+  field of a vault or factory in one `Promise.all` batch instead of
+  sequencing `balance()`/`owner()`/`token()`/etc. individually. Useful
+  for a dashboard or explorer that wants a vault's/factory's full state
+  in one shot. Rejects if any individual read would (e.g.
+  `NotInitialized`).
+
 ## [0.8.0] - 2026-09-18
 
 ### Added
