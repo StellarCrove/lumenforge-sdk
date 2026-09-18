@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.13.0] - 2026-09-18
+
+### Added
+
+- `lumenforge` CLI (`bin/lumenforge` -> `dist/cli.js`), a thin wrapper
+  over the library for scripting: `vault snapshot/deposit/withdraw/
+  keep-alive`, `factory snapshot/deploy-vault/list-vaults/
+  keep-owner-vaults-alive`, `events list`. Signs with a `Keypair` from
+  `LUMENFORGE_SECRET_KEY` (env var only — never a `--flag`, to avoid the
+  secret landing in `ps` output or shell history). Uses
+  `@stellar/stellar-sdk/contract`'s `KeypairSigner`; no new dependency
+  (arg parsing via Node's built-in `node:util.parseArgs`). Wraps a
+  subset of the library surface (the common scripting cases), not every
+  method.
+
 ## [0.12.0] - 2026-09-18
 
 ### Added
