@@ -5,6 +5,11 @@ import {
   type MethodOptions,
 } from "@stellar/stellar-sdk/contract";
 import { FACTORY_ERROR_TYPES } from "./errors.js";
+import {
+  extendTtl,
+  type KeepAliveOptions,
+  type TtlExtendable,
+} from "./keeper.js";
 import { ownerNonceSalt, randomSalt } from "./salt.js";
 import { getVaultSnapshot, type VaultReader, type VaultSnapshot } from "./snapshot.js";
 
@@ -297,6 +302,45 @@ export async function collectVaultSnapshotsByOwner(
     options,
   )) {
     results.push(result);
+  }
+  return results;
+}
+
+/** One vault's TTL-extension outcome, keyed by address rather than the connected client. */
+export interface KeepOwnerVaultsAliveResult {
+  address: string;
+  status: "ok" | "error";
+  error?: unknown;
+}
+
+/**
+ * Discovers every vault `owner` has (via `iterateVaultsByOwner`) and
+ * extends each one's own TTL — the fleet-wide version of calling
+ * {@link extendTtl}/{@link keepAlive} yourself once you already have a
+ * list of vaults. One vault's failure doesn't stop the rest, same as
+ * `keepAlive`.
+ *
+ * This does **not** also extend the factory's own `VaultsByOwner(owner)`
+ * entry TTL — that's a separate, factory-level concern with its own
+ * lifetime; call {@link extendVaultsByOwnerTtl} alongside this if you
+ * want both kept alive from the same cron run.
+ */
+export async function keepOwnerVaultsAlive(
+  factory: VaultsByOwnerReader,
+  owner: string,
+  connect: (address: string) => Promise<TtlExtendable>,
+  options: PaginationOptions & KeepAliveOptions = {},
+): Promise<KeepOwnerVaultsAliveResult[]> {
+  const results: KeepOwnerVaultsAliveResult[] = [];
+  for await (const address of iterateVaultsByOwner(factory, owner, options)) {
+    try {
+      const vault = await connect(address);
+      const tx = await extendTtl(vault, options);
+      await tx.signAndSend();
+      results.push({ address, status: "ok" });
+    } catch (error) {
+      results.push({ address, status: "error", error });
+    }
   }
   return results;
 }
