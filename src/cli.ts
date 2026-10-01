@@ -40,10 +40,19 @@ export function requireEnv(name: string): string {
   return v;
 }
 
-function print(value: unknown): void {
-  console.log(
-    JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 2),
-  );
+/**
+ * Formats a CLI result for output. When `json` is true, emits compact
+ * single-line JSON suitable for piping into `jq` or other tools. Otherwise
+ * emits pretty-printed JSON (the default human-readable format).
+ * Bigint values are serialized as decimal strings in both modes.
+ */
+export function formatCliOutput(value: unknown, json: boolean): string {
+  const replacer = (_k: string, v: unknown) => (typeof v === "bigint" ? v.toString() : v);
+  return JSON.stringify(value, replacer, json ? undefined : 2);
+}
+
+function print(value: unknown, json = false): void {
+  console.log(formatCliOutput(value, json));
 }
 
 export interface Network {
@@ -111,6 +120,7 @@ function parseCliArgs() {
         "start-ledger": { type: "string" },
         kind: { type: "string" },
         "with-snapshots": { type: "boolean" },
+        json: { type: "boolean" },
         help: { type: "boolean" },
       },
     });
@@ -138,6 +148,9 @@ factory list-vaults           --contract <C...> --owner <G...> [--with-snapshots
 factory keep-owner-vaults-alive --contract <C...> --owner <G...> [--threshold <n>] [--extend-to <n>]
 
 events list       --contract <C...> --start-ledger <n> --kind vault|factory
+
+Global options:
+  --json                          emit compact machine-parseable JSON
 `;
 
 export function requiredArg(name: string, value: string | undefined): string {
@@ -198,7 +211,7 @@ export async function main(): Promise<void> {
     if (action === "snapshot") {
       const publicKey = getReadOnlyPublicKey(values["public-key"]);
       const vault = await connectVault({ contractId, ...net, publicKey });
-      return print(await getVaultSnapshot(vault));
+      return print(await getVaultSnapshot(vault), values.json);
     }
 
     if (action === "deposit") {
@@ -207,7 +220,7 @@ export async function main(): Promise<void> {
       const signer = getSigner(net.networkPassphrase);
       const vault = await connectVault({ contractId, ...net, publicKey: signer.address, signTransaction: signer });
       const tx = await vault.deposit({ from, amount });
-      return print(await tx.signAndSend());
+      return print(await tx.signAndSend(), values.json);
     }
 
     if (action === "withdraw") {
@@ -215,7 +228,7 @@ export async function main(): Promise<void> {
       const signer = getSigner(net.networkPassphrase);
       const vault = await connectVault({ contractId, ...net, publicKey: signer.address, signTransaction: signer });
       const tx = await vault.withdraw({ amount });
-      return print(await tx.signAndSend());
+      return print(await tx.signAndSend(), values.json);
     }
 
     if (action === "keep-alive") {
@@ -224,7 +237,7 @@ export async function main(): Promise<void> {
       const threshold = optionalIntArg("threshold", values.threshold);
       const extendTo = optionalIntArg("extend-to", values["extend-to"]);
       const tx = await extendTtl(vault, { threshold, extendTo });
-      return print(await tx.signAndSend());
+      return print(await tx.signAndSend(), values.json);
     }
 
     fail(`unknown vault action: ${action}`);
@@ -236,7 +249,7 @@ export async function main(): Promise<void> {
     if (action === "snapshot") {
       const publicKey = getReadOnlyPublicKey(values["public-key"]);
       const factory = await connectFactory({ contractId, ...net, publicKey });
-      return print(await getFactorySnapshot(factory));
+      return print(await getFactorySnapshot(factory), values.json);
     }
 
     if (action === "deploy-vault") {
@@ -253,7 +266,7 @@ export async function main(): Promise<void> {
         { owner, token, min_deposit: minDeposit, max_balance: maxBalance },
         salt ? { salt } : {},
       );
-      return print(await tx.signAndSend());
+      return print(await tx.signAndSend(), values.json);
     }
 
     if (action === "list-vaults") {
@@ -264,9 +277,9 @@ export async function main(): Promise<void> {
         const results = await collectVaultSnapshotsByOwner(factory, owner, (address) =>
           connectVault({ contractId: address, ...net, publicKey }),
         );
-        return print(results);
+        return print(results, values.json);
       }
-      return print(await collectVaultsByOwner(factory, owner));
+      return print(await collectVaultsByOwner(factory, owner), values.json);
     }
 
     if (action === "keep-owner-vaults-alive") {
@@ -281,7 +294,7 @@ export async function main(): Promise<void> {
         (address) => connectVault({ contractId: address, ...net, publicKey: signer.address, signTransaction: signer }),
         { threshold, extendTo },
       );
-      return print(results);
+      return print(results, values.json);
     }
 
     fail(`unknown factory action: ${action}`);
@@ -298,7 +311,7 @@ export async function main(): Promise<void> {
       filters: [{ type: "contract", contractIds: [contractId] }],
       startLedger,
     });
-    return print(kind === "vault" ? decodeVaultEvents(events) : decodeFactoryEvents(events));
+    return print(kind === "vault" ? decodeVaultEvents(events) : decodeFactoryEvents(events), values.json);
   }
 
   fail(`unknown command: ${resource} ${action}`);
