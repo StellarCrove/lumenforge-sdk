@@ -56,9 +56,11 @@ export {
   decodeFactoryEvent,
   decodeVaultEvents,
   decodeFactoryEvents,
+  subscribeVaultEvents,
 } from "./events.js";
 export type {
   RawContractEvent,
+  EventStreamOptions,
   VaultEvent,
   FactoryEvent,
   DepositEvent,

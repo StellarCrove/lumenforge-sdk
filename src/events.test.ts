@@ -5,6 +5,7 @@ import {
   decodeFactoryEvents,
   decodeVaultEvent,
   decodeVaultEvents,
+  subscribeVaultEvents,
   type RawContractEvent,
 } from "./events.js";
 
@@ -220,5 +221,110 @@ describe("decodeVaultEvents / decodeFactoryEvents", () => {
     expect(decodeFactoryEvents(events)).toEqual([
       { type: "vault_deployed", owner, vault },
     ]);
+  });
+});
+
+describe("subscribeVaultEvents", () => {
+  it("streams and decodes events while tracking cursor and ledger", async () => {
+    const ev1 = event(
+      [symbol("deposit"), address(from)],
+      dataMap({ amount: i128(100n), new_balance: i128(100n) }),
+    );
+    const ev2 = event(
+      [symbol("withdraw"), address(owner)],
+      dataMap({ amount: i128(40n), new_balance: i128(60n) }),
+    );
+
+    let callCount = 0;
+    const controller = new AbortController();
+
+    const mockServer = {
+      getEvents: async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            events: [{ ...ev1, id: "cursor-1", ledger: 100 }],
+            latestLedger: 100,
+            cursor: "cursor-1",
+          };
+        } else if (callCount === 2) {
+          return {
+            events: [{ ...ev2, id: "cursor-2", ledger: 101 }],
+            latestLedger: 101,
+            cursor: "cursor-2",
+          };
+        } else {
+          controller.abort();
+          return {
+            events: [],
+            latestLedger: 101,
+            cursor: "cursor-2",
+          };
+        }
+      },
+    };
+
+    const results = [];
+    for await (const ev of subscribeVaultEvents({
+      server: mockServer,
+      contractId: vault,
+      pollIntervalMs: 5,
+      signal: controller.signal,
+    })) {
+      results.push(ev);
+    }
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({
+      type: "deposit",
+      from,
+      amount: 100n,
+      new_balance: 100n,
+    });
+    expect(results[1]).toMatchObject({
+      type: "withdraw",
+      owner,
+      amount: 40n,
+      new_balance: 60n,
+    });
+  });
+
+  it("handles transient errors with backoff retry and recovers", async () => {
+    const ev = event([symbol("paused"), address(owner)], dataMap({}));
+
+    let attempts = 0;
+    const controller = new AbortController();
+
+    const mockServer = {
+      getEvents: async () => {
+        attempts++;
+        if (attempts === 1) {
+          throw new Error("Transient RPC connection timeout");
+        }
+        controller.abort();
+        return {
+          events: [{ ...ev, id: "cursor-pause", ledger: 200 }],
+          latestLedger: 200,
+        };
+      },
+    };
+
+    const results = [];
+    for await (const evItem of subscribeVaultEvents({
+      server: mockServer,
+      contractId: vault,
+      pollIntervalMs: 5,
+      initialBackoffMs: 10,
+      signal: controller.signal,
+    })) {
+      results.push(evItem);
+    }
+
+    expect(attempts).toBeGreaterThanOrEqual(2);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      type: "paused",
+      owner,
+    });
   });
 });
