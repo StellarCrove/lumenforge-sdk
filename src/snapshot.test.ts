@@ -76,6 +76,24 @@ describe("getVaultSnapshot", () => {
       order.indexOf("balance:end"),
     );
   });
+
+  it("recovers from transient RPC error and successfully returns snapshot", async () => {
+    let attempts = 0;
+    const vault = fakeVault({
+      balance: async () => {
+        attempts++;
+        if (attempts === 1) {
+          throw new Error("HTTP 429 Too Many Requests");
+        }
+        return { result: 1000n };
+      },
+    });
+    const snapshot = await getVaultSnapshot(vault, {
+      retry: { baseDelayMs: 1, maxDelayMs: 5 },
+    });
+    expect(snapshot.balance).toBe(1000n);
+    expect(attempts).toBe(2);
+  });
 });
 
 describe("getFactorySnapshot", () => {

@@ -1,3 +1,5 @@
+import { withRetry, type RetryOptions } from "./utils/retry.js";
+
 /**
  * Batched reads of a vault's/factory's full on-chain state. Each field on
  * `VaultClient`/`FactoryClient` is its own RPC round trip; a dashboard or
@@ -5,6 +7,11 @@
  * to either sequence seven calls or hand-roll the `Promise.all`. These
  * just do that once, in parallel, and unwrap `.result` for you.
  */
+
+export interface SnapshotOptions {
+  /** Optional retry options for transient RPC network errors. */
+  retry?: RetryOptions;
+}
 
 export interface VaultSnapshot {
   balance: bigint;
@@ -32,19 +39,22 @@ export interface VaultReader {
  * call would (e.g. `owner()`/`token()` throwing `NotInitialized` for a
  * vault that somehow isn't — this doesn't paper over that, it just
  * doesn't make you sequence the seven calls to find out).
+ * Automatically retries transient RPC errors using exponential backoff.
  */
 export async function getVaultSnapshot(
   vault: VaultReader,
+  options?: SnapshotOptions,
 ): Promise<VaultSnapshot> {
+  const retryOpts = options?.retry;
   const [balance, owner, pendingOwner, token, minDeposit, maxBalance, paused] =
     await Promise.all([
-      vault.balance(),
-      vault.owner(),
-      vault.pending_owner(),
-      vault.token(),
-      vault.min_deposit(),
-      vault.max_balance(),
-      vault.paused(),
+      withRetry(() => vault.balance(), retryOpts),
+      withRetry(() => vault.owner(), retryOpts),
+      withRetry(() => vault.pending_owner(), retryOpts),
+      withRetry(() => vault.token(), retryOpts),
+      withRetry(() => vault.min_deposit(), retryOpts),
+      withRetry(() => vault.max_balance(), retryOpts),
+      withRetry(() => vault.paused(), retryOpts),
     ]);
   return {
     balance: balance.result,
@@ -71,10 +81,12 @@ export interface FactoryReader {
 /** Reads a factory's own state (not any specific owner's vaults) in parallel. */
 export async function getFactorySnapshot(
   factory: FactoryReader,
+  options?: SnapshotOptions,
 ): Promise<FactorySnapshot> {
+  const retryOpts = options?.retry;
   const [vaultCount, vaultWasmHash] = await Promise.all([
-    factory.vault_count(),
-    factory.vault_wasm_hash(),
+    withRetry(() => factory.vault_count(), retryOpts),
+    withRetry(() => factory.vault_wasm_hash(), retryOpts),
   ]);
   return {
     vaultCount: vaultCount.result,

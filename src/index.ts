@@ -49,7 +49,15 @@ export type {
   VaultReader,
   FactorySnapshot,
   FactoryReader,
+  SnapshotOptions,
 } from "./snapshot.js";
+
+export {
+  withRetry,
+  isTransientError,
+  calculateBackoff,
+} from "./utils/retry.js";
+export type { RetryOptions } from "./utils/retry.js";
 
 export {
   decodeVaultEvent,
