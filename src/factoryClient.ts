@@ -6,7 +6,10 @@ import {
 } from "@stellar/stellar-sdk/contract";
 import { FACTORY_ERROR_TYPES } from "./errors.js";
 import {
+  batchKeepAlive,
   extendTtl,
+  type BatchKeepAliveOptions,
+  type BatchSummary,
   type KeepAliveOptions,
   type TtlExtendable,
 } from "./keeper.js";
@@ -343,4 +346,38 @@ export async function keepOwnerVaultsAlive(
     }
   }
   return results;
+}
+
+/** The outcome of a batch keepAlive run across an owner's vaults. */
+export interface BatchKeepOwnerVaultsAliveResult {
+  batches: BatchSummary[];
+  results: KeepOwnerVaultsAliveResult[];
+}
+
+/**
+ * Discovers every vault `owner` has (via `collectVaultsByOwner`) and
+ * extends each one using `batchKeepAlive`, bundling up to 100 extensions
+ * per transaction while maintaining individual failure isolation.
+ */
+export async function batchKeepOwnerVaultsAlive(
+  factory: VaultsByOwnerReader,
+  owner: string,
+  connect: (address: string) => Promise<TtlExtendable>,
+  options: PaginationOptions & BatchKeepAliveOptions = {},
+): Promise<BatchKeepOwnerVaultsAliveResult> {
+  const addresses = await collectVaultsByOwner(factory, owner, options);
+  const targets: (TtlExtendable & { address: string })[] = [];
+  for (const address of addresses) {
+    const client = await connect(address);
+    targets.push(Object.assign(client, { address }));
+  }
+  const { batches, results } = await batchKeepAlive(targets, options);
+  return {
+    batches,
+    results: results.map((r) => ({
+      address: (r.target as { address: string }).address,
+      status: r.status,
+      error: r.error,
+    })),
+  };
 }

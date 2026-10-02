@@ -4,6 +4,7 @@ import {
   collectVaultsByOwner,
   collectVaultSnapshotsByOwner,
   keepOwnerVaultsAlive,
+  batchKeepOwnerVaultsAlive,
   deployVaultViaFactory,
   type VaultsByOwnerReader,
   type VaultDeployer,
@@ -341,19 +342,19 @@ describe("collectVaultSnapshotsByOwner", () => {
   });
 });
 
+function fakeTtlTarget(
+  onExtend?: (args: { threshold: number; extend_to: number }) => void,
+): TtlExtendable {
+  return {
+    async extend_ttl(args) {
+      onExtend?.(args);
+      return { signAndSend: async () => ({ result: null }) } as never;
+    },
+  };
+}
+
 describe("keepOwnerVaultsAlive", () => {
   const OWNER = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
-
-  function fakeTtlTarget(
-    onExtend?: (args: { threshold: number; extend_to: number }) => void,
-  ): TtlExtendable {
-    return {
-      async extend_ttl(args) {
-        onExtend?.(args);
-        return { signAndSend: async () => ({ result: null }) } as never;
-      },
-    };
-  }
 
   it("extends every discovered vault and reports success", async () => {
     const reader = fakeReader([["v1", "v2"]]);
@@ -414,5 +415,40 @@ describe("keepOwnerVaultsAlive", () => {
       { pageSize: 5 },
     );
     expect(results).toEqual([]);
+  });
+});
+
+describe("batchKeepOwnerVaultsAlive", () => {
+  const OWNER = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+
+  it("discovers vaults and extends them in batches", async () => {
+    const reader = fakeReader([["v1", "v2", "v3"]]);
+    const connected: string[] = [];
+    const connect = async (address: string) => {
+      connected.push(address);
+      return fakeTtlTarget();
+    };
+
+    const res = await batchKeepOwnerVaultsAlive(reader, OWNER, connect, {
+      batchSize: 2,
+    });
+
+    expect(connected).toEqual(["v1", "v2", "v3"]);
+    expect(res.batches).toHaveLength(2);
+    expect(res.results).toEqual([
+      { address: "v1", status: "ok" },
+      { address: "v2", status: "ok" },
+      { address: "v3", status: "ok" },
+    ]);
+  });
+
+  it("handles empty vaults gracefully", async () => {
+    const reader = fakeReader([[]]);
+    const res = await batchKeepOwnerVaultsAlive(
+      reader,
+      OWNER,
+      async () => fakeTtlTarget(),
+    );
+    expect(res).toEqual({ batches: [], results: [] });
   });
 });

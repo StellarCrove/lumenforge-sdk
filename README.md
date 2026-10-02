@@ -220,6 +220,57 @@ const results = await keepOwnerVaultsAlive(factory, "G...", (address) =>
 await (await extendVaultsByOwnerTtl(factory, "G...")).signAndSend();
 ```
 
+### High-performance batch keeping (multi-vault)
+
+When managing dozens or hundreds of vaults, running sequential transactions creates significant submission overhead and network latency. `batchKeepAlive` bundles multiple `extend_ttl` operations into batches of up to 100 per Stellar transaction envelope (respecting Stellar ledger operation limits):
+
+```ts
+import { batchKeepAlive } from "@lumenforge/sdk";
+
+const { batches, results } = await batchKeepAlive(vaults, {
+  batchSize: 100, // default and max is 100
+  threshold: 17280, // extend if <= 1 day remaining
+  extendTo: 518400, // extend to ~30 days out
+  onBatchComplete: (batch) => {
+    console.log(`Batch ${batch.index} finished with status: ${batch.status}`);
+  },
+});
+```
+
+**Failure Isolation:** If a batched simulation or submission fails (e.g. one contract was destroyed or encountered an error), `batchKeepAlive` automatically falls back to submitting the operations individually so healthy vaults are renewed without disruption (`status: "fallback"`).
+
+You can also discover and batch-extend all vaults for an owner directly:
+
+```ts
+import { batchKeepOwnerVaultsAlive } from "@lumenforge/sdk";
+
+const { batches, results } = await batchKeepOwnerVaultsAlive(
+  factory,
+  "G...",
+  (address) => connectVault({ contractId: address, ... }),
+  { batchSize: 100 },
+);
+```
+
+#### Low-level transaction builder
+
+To construct a raw Stellar `Transaction` with bundled `extend_ttl` operations without executing it immediately:
+
+```ts
+import {
+  buildBatchExtendTtlOperations,
+  buildBatchExtendTtlTransaction,
+} from "@lumenforge/sdk";
+
+// Build a transaction envelope with up to 100 extend_ttl operations:
+const tx = buildBatchExtendTtlTransaction({
+  sourceAccount,
+  networkPassphrase: "Test SDF Network ; September 2015",
+  contractAddresses: ["C1...", "C2...", "C3..."],
+  fee: "100", // base fee per op
+});
+```
+
 ### Reading full state at once
 
 `balance()`, `owner()`, `token()`, `paused()`, etc. are each their own

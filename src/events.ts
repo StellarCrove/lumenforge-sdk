@@ -186,3 +186,142 @@ export function decodeFactoryEvents(
     .map(decodeFactoryEvent)
     .filter((e): e is FactoryEvent => e !== undefined);
 }
+
+/**
+ * Options for subscribing to real-time vault contract events.
+ */
+export interface EventStreamOptions {
+  /** Soroban RPC server instance or compatible interface */
+  server: {
+    getEvents: (request: {
+      startLedger?: number;
+      cursor?: string;
+      filters?: Array<{
+        type?: "contract" | "diagnostic" | "system";
+        contractIds?: string[];
+        topics?: (string | string[])[];
+      }>;
+      limit?: number;
+    }) => Promise<{
+      events: Array<RawContractEvent & { id?: string; ledger?: number }>;
+      latestLedger?: number;
+      cursor?: string;
+    }>;
+    getLatestLedger?: () => Promise<{ sequence: number }>;
+  };
+  /** Contract ID of the LumenVault to listen to */
+  contractId: string;
+  /** Ledger sequence to start streaming from */
+  startLedger?: number;
+  /** Initial event cursor to resume from */
+  cursor?: string;
+  /** Polling interval in milliseconds (default: 1000) */
+  pollIntervalMs?: number;
+  /** Initial backoff delay on network error in milliseconds (default: 1000) */
+  initialBackoffMs?: number;
+  /** Maximum backoff delay on network error in milliseconds (default: 30000) */
+  maxBackoffMs?: number;
+  /** Optional AbortSignal for graceful cancellation */
+  signal?: AbortSignal;
+}
+
+/**
+ * Subscribes to LumenVault events as an AsyncIterable stream.
+ * Automatically tracks cursors/ledger sequence, decodes events into typed `VaultEvent` objects,
+ * applies exponential backoff on transient RPC failures, and terminates gracefully on AbortSignal.
+ */
+export async function* subscribeVaultEvents(
+  options: EventStreamOptions,
+): AsyncIterable<VaultEvent> {
+  const {
+    server,
+    contractId,
+    pollIntervalMs = 1000,
+    initialBackoffMs = 1000,
+    maxBackoffMs = 30000,
+    signal,
+  } = options;
+
+  let currentCursor: string | undefined = options.cursor;
+  let currentStartLedger: number | undefined = options.startLedger;
+  let currentBackoff = initialBackoffMs;
+
+  const sleep = (ms: number): Promise<void> =>
+    new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        return reject(new Error("Subscription aborted"));
+      }
+      const timeout = setTimeout(() => {
+        if (signal) {
+          signal.removeEventListener("abort", onAbort);
+        }
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", onAbort);
+        reject(new Error("Subscription aborted"));
+      };
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+    });
+
+  while (!signal?.aborted) {
+    try {
+      const request: Parameters<typeof server.getEvents>[0] = {
+        filters: [
+          {
+            type: "contract",
+            contractIds: [contractId],
+          },
+        ],
+        limit: 100,
+      };
+
+      if (currentCursor) {
+        request.cursor = currentCursor;
+      } else if (currentStartLedger !== undefined) {
+        request.startLedger = currentStartLedger;
+      }
+
+      const response = await server.getEvents(request);
+
+      // Reset backoff upon successful RPC call
+      currentBackoff = initialBackoffMs;
+
+      if (response.events && response.events.length > 0) {
+        for (const rawEv of response.events) {
+          const decoded = decodeVaultEvent(rawEv);
+          if (decoded) {
+            yield decoded;
+          }
+          if (rawEv.id) {
+            currentCursor = rawEv.id;
+          }
+          if (rawEv.ledger) {
+            currentStartLedger = rawEv.ledger + 1;
+          }
+          if (signal?.aborted) break;
+        }
+      }
+
+      if (response.cursor) {
+        currentCursor = response.cursor;
+      }
+      if (response.latestLedger && currentStartLedger === undefined) {
+        currentStartLedger = response.latestLedger + 1;
+      }
+
+      await sleep(pollIntervalMs);
+    } catch {
+      if (signal?.aborted) {
+        break;
+      }
+      // Wait with exponential backoff on transient errors
+      await sleep(currentBackoff);
+      currentBackoff = Math.min(currentBackoff * 2, maxBackoffMs);
+    }
+  }
+}
+
