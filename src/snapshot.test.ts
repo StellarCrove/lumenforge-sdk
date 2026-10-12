@@ -46,6 +46,15 @@ describe("getVaultSnapshot", () => {
     expect(snapshot.paused).toBe(true);
   });
 
+  it("reflects allowancesEnabled when vault supports it", async () => {
+    const snapshot = await getVaultSnapshot(
+      fakeVault({
+        allowances_enabled: async () => ({ result: true }),
+      }),
+    );
+    expect(snapshot.allowancesEnabled).toBe(true);
+  });
+
   it("propagates a failure from any individual call", async () => {
     const vault = fakeVault({
       owner: async () => {

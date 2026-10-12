@@ -16,6 +16,10 @@ export interface VaultMethods {
     args: { from: string; amount: bigint },
     options?: MethodOptions,
   ): Promise<AssembledTransaction<bigint>>;
+  batch_deposit(
+    args: { deposits: Array<[string, bigint]> },
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<bigint>>;
   withdraw(
     args: { amount: bigint },
     options?: MethodOptions,
@@ -28,6 +32,14 @@ export interface VaultMethods {
   ): Promise<AssembledTransaction<null>>;
   set_max_balance(
     args: { max_balance: bigint | undefined },
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<null>>;
+  set_allowances_enabled(
+    args: { enabled: boolean },
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<null>>;
+  set_allowance(
+    args: { depositor: string; amount: bigint },
     options?: MethodOptions,
   ): Promise<AssembledTransaction<null>>;
   rescue(
@@ -54,6 +66,16 @@ export interface VaultMethods {
     options?: MethodOptions,
   ): Promise<AssembledTransaction<bigint | undefined>>;
   paused(options?: MethodOptions): Promise<AssembledTransaction<boolean>>;
+  allowances_enabled(
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<boolean>>;
+  allowance(
+    args: { depositor: string },
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<bigint>>;
+  allowance_members(
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<string[]>>;
   extend_ttl(
     args: { threshold: number; extend_to: number },
     options?: MethodOptions,

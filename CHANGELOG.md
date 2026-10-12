@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.15.0] - 2026-10-12
+
+### Added
+
+- `VaultMethods`: added typed bindings for `lumen_vault` 0.6.0 methods:
+  `batch_deposit`, `set_allowances_enabled`, `set_allowance`,
+  `allowances_enabled`, `allowance`, and `allowance_members`.
+- `VAULT_ERROR_TYPES`: added error messages for code 11 (`BatchTooLarge`),
+  code 12 (`AllowanceExceeded`), and code 13 (`AllowanceListFull`).
+- `VaultSnapshot`: added `allowancesEnabled?: boolean` field reflecting
+  whether depositor allowances are currently active.
+- CLI: added `vault batch-deposit --contract <C...> --deposits <addr:amount,...>`
+  command and `--deposits` argument parsing (`parseDepositsArg`).
+- `test/fixtures/lumen_vault.wasm`: updated compiled test fixture to
+  `lumen_vault` 0.6.0; updated `src/spec.test.ts` to assert all 24 vault
+  methods and 13 error codes.
+
 ## [0.14.0] - 2026-09-18
 
 ### Added

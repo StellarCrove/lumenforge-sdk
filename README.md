@@ -40,6 +40,19 @@ const { result: token } = await vault.token();
 
 const tx = await vault.deposit({ from: "G...", amount: 500n });
 await tx.signAndSend();
+
+// Or deposit for multiple accounts in a single atomic transaction:
+const batchTx = await vault.batch_deposit({
+  deposits: [
+    ["G...", 500n],
+    ["G...", 250n],
+  ],
+});
+await batchTx.signAndSend();
+
+// Manage optional per-depositor allowances (lumen_vault >= 0.6.0):
+await (await vault.set_allowance({ depositor: "G...", amount: 1000n })).signAndSend();
+await (await vault.set_allowances_enabled({ enabled: true })).signAndSend();
 ```
 
 ### Deploy a new vault directly
@@ -332,6 +345,7 @@ else.
 export LUMENFORGE_SECRET_KEY="S..."
 
 lumenforge vault deposit --contract C... --from G... --amount 500
+lumenforge vault batch-deposit --contract C... --deposits G...:500,G...:250
 lumenforge vault withdraw --contract C... --amount 200
 lumenforge vault keep-alive --contract C...
 

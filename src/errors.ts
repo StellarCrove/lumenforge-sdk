@@ -31,6 +31,18 @@ export const VAULT_ERROR_TYPES: Record<number, { message: string }> = {
     message:
       "InvalidConfiguration: min_deposit/max_balance cannot be negative.",
   },
+  11: {
+    message:
+      "BatchTooLarge: batch_deposit was given more than MAX_BATCH_DEPOSITS (20) entries.",
+  },
+  12: {
+    message:
+      "AllowanceExceeded: deposit exceeds the depositor's remaining allowance.",
+  },
+  13: {
+    message:
+      "AllowanceListFull: cannot add allowance, member list is full (max 32).",
+  },
 };
 
 export const FACTORY_ERROR_TYPES: Record<number, { message: string }> = {

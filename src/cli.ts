@@ -111,6 +111,7 @@ function parseCliArgs() {
         "start-ledger": { type: "string" },
         kind: { type: "string" },
         "with-snapshots": { type: "boolean" },
+        deposits: { type: "string" },
         help: { type: "boolean" },
       },
     });
@@ -129,6 +130,7 @@ Environment (required for state-changing commands; never pass as a flag):
 
 vault snapshot   --contract <C...> [--public-key <G...>]
 vault deposit     --contract <C...> --from <G...> --amount <n>
+vault batch-deposit --contract <C...> --deposits <G...:amount,G...:amount>
 vault withdraw    --contract <C...> --amount <n>
 vault keep-alive  --contract <C...> [--threshold <n>] [--extend-to <n>]
 
@@ -181,6 +183,23 @@ export function optionalIntArg(name: string, value: string | undefined): number 
   return parsed;
 }
 
+/** Parses comma-separated `address:amount` pairs into `Array<[string, bigint]>`. */
+export function parseDepositsArg(raw: string): Array<[string, bigint]> {
+  const trimmed = raw.trim();
+  if (!trimmed) fail("--deposits cannot be empty");
+  const entries = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+  if (entries.length === 0) fail("--deposits cannot be empty");
+  return entries.map((entry) => {
+    const parts = entry.split(":");
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      fail(`invalid deposit pair in --deposits: ${JSON.stringify(entry)}, expected <address:amount>`);
+    }
+    const from = parts[0].trim();
+    const amount = parseBigintArg("amount", parts[1].trim());
+    return [from, amount];
+  });
+}
+
 export async function main(): Promise<void> {
   const { values, positionals } = parseCliArgs();
   const [resource, action] = positionals;
@@ -207,6 +226,15 @@ export async function main(): Promise<void> {
       const signer = getSigner(net.networkPassphrase);
       const vault = await connectVault({ contractId, ...net, publicKey: signer.address, signTransaction: signer });
       const tx = await vault.deposit({ from, amount });
+      return print(await tx.signAndSend());
+    }
+
+    if (action === "batch-deposit") {
+      const depositsRaw = requiredArg("deposits", values.deposits);
+      const deposits = parseDepositsArg(depositsRaw);
+      const signer = getSigner(net.networkPassphrase);
+      const vault = await connectVault({ contractId, ...net, publicKey: signer.address, signTransaction: signer });
+      const tx = await vault.batch_deposit({ deposits });
       return print(await tx.signAndSend());
     }
 

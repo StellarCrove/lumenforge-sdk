@@ -14,6 +14,8 @@ export interface VaultSnapshot {
   minDeposit: bigint;
   maxBalance: bigint | undefined;
   paused: boolean;
+  /** `true` if per-address deposit allowances are enforced (lumen_vault >= 0.6.0). */
+  allowancesEnabled?: boolean;
 }
 
 /** The subset of `VaultClient` this needs — any real one has all of it. */
@@ -25,27 +27,37 @@ export interface VaultReader {
   min_deposit(): Promise<{ result: bigint }>;
   max_balance(): Promise<{ result: bigint | undefined }>;
   paused(): Promise<{ result: boolean }>;
+  allowances_enabled?(): Promise<{ result: boolean }>;
 }
 
 /**
  * Reads every field of a vault in parallel. Rejects if any individual
  * call would (e.g. `owner()`/`token()` throwing `NotInitialized` for a
  * vault that somehow isn't — this doesn't paper over that, it just
- * doesn't make you sequence the seven calls to find out).
+ * doesn't make you sequence the calls to find out).
  */
 export async function getVaultSnapshot(
   vault: VaultReader,
 ): Promise<VaultSnapshot> {
-  const [balance, owner, pendingOwner, token, minDeposit, maxBalance, paused] =
-    await Promise.all([
-      vault.balance(),
-      vault.owner(),
-      vault.pending_owner(),
-      vault.token(),
-      vault.min_deposit(),
-      vault.max_balance(),
-      vault.paused(),
-    ]);
+  const [
+    balance,
+    owner,
+    pendingOwner,
+    token,
+    minDeposit,
+    maxBalance,
+    paused,
+    allowancesEnabled,
+  ] = await Promise.all([
+    vault.balance(),
+    vault.owner(),
+    vault.pending_owner(),
+    vault.token(),
+    vault.min_deposit(),
+    vault.max_balance(),
+    vault.paused(),
+    vault.allowances_enabled ? vault.allowances_enabled() : Promise.resolve(undefined),
+  ]);
   return {
     balance: balance.result,
     owner: owner.result,
@@ -54,6 +66,9 @@ export async function getVaultSnapshot(
     minDeposit: minDeposit.result,
     maxBalance: maxBalance.result,
     paused: paused.result,
+    ...(allowancesEnabled !== undefined
+      ? { allowancesEnabled: allowancesEnabled.result }
+      : {}),
   };
 }
 

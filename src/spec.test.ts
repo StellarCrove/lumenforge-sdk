@@ -36,11 +36,14 @@ describe("lumen_vault spec", () => {
   it("exposes every method declared in VaultMethods", () => {
     const expected = [
       "deposit",
+      "batch_deposit",
       "withdraw",
       "pause",
       "unpause",
       "set_min_deposit",
       "set_max_balance",
+      "set_allowances_enabled",
+      "set_allowance",
       "rescue",
       "propose_owner",
       "cancel_pending_owner",
@@ -52,6 +55,9 @@ describe("lumen_vault spec", () => {
       "min_deposit",
       "max_balance",
       "paused",
+      "allowances_enabled",
+      "allowance",
+      "allowance_members",
       "extend_ttl",
     ];
     for (const name of expected) {

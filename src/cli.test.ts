@@ -6,6 +6,7 @@ import {
   getReadOnlyPublicKey,
   optionalBigint,
   optionalIntArg,
+  parseDepositsArg,
   requiredArg,
   requiredBigintArg,
   requiredIntArg,
@@ -196,5 +197,32 @@ describe("optionalIntArg", () => {
     expect(() => optionalIntArg("threshold", "1.5")).toThrow(
       /--threshold must be an integer/,
     );
+  });
+});
+
+describe("parseDepositsArg", () => {
+  it("parses single deposit pair", () => {
+    expect(parseDepositsArg("GABC:100")).toEqual([["GABC", 100n]]);
+  });
+
+  it("parses multiple comma-separated deposit pairs with whitespace", () => {
+    expect(parseDepositsArg(" GABC:100 , GXYZ:500 ")).toEqual([
+      ["GABC", 100n],
+      ["GXYZ", 500n],
+    ]);
+  });
+
+  it("fails on empty or whitespace string", () => {
+    expect(() => parseDepositsArg("   ")).toThrow(/--deposits cannot be empty/);
+  });
+
+  it("fails on malformed pair missing amount or address", () => {
+    expect(() => parseDepositsArg("GABC")).toThrow(/invalid deposit pair/);
+    expect(() => parseDepositsArg("GABC:")).toThrow(/invalid deposit pair/);
+    expect(() => parseDepositsArg(":100")).toThrow(/invalid deposit pair/);
+  });
+
+  it("fails on non-integer amount", () => {
+    expect(() => parseDepositsArg("GABC:notanumber")).toThrow(/must be an integer/);
   });
 });
