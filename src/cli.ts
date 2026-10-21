@@ -160,8 +160,11 @@ export function requiredArg(name: string, value: string | undefined): string {
   return value;
 }
 
-/** Parses `value` as a `bigint`, failing with a clean message instead of a raw `SyntaxError`. */
+/** Parses `value` as a `bigint`, failing with a clean message instead of a raw `SyntaxError` or silent `0n` on empty strings. */
 export function parseBigintArg(name: string, value: string): bigint {
+  if (value.trim() === "") {
+    fail(`--${name} must be an integer, got ${JSON.stringify(value)}`);
+  }
   try {
     return BigInt(value);
   } catch {
@@ -179,9 +182,13 @@ export function optionalBigint(name: string, value: string | undefined): bigint 
 
 /** Parses `value` as a non-negative integer `number` (e.g. a ledger sequence). */
 export function requiredIntArg(name: string, value: string | undefined): number {
-  const parsed = Number(requiredArg(name, value));
+  const raw = requiredArg(name, value);
+  if (raw.trim() === "") {
+    fail(`--${name} must be a non-negative integer, got ${JSON.stringify(raw)}`);
+  }
+  const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 0) {
-    fail(`--${name} must be a non-negative integer, got ${JSON.stringify(value)}`);
+    fail(`--${name} must be a non-negative integer, got ${JSON.stringify(raw)}`);
   }
   return parsed;
 }
@@ -189,6 +196,9 @@ export function requiredIntArg(name: string, value: string | undefined): number 
 /** Parses an optional integer flag (e.g. `--threshold`), distinguishing "absent" from an explicit but empty value. */
 export function optionalIntArg(name: string, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
+  if (value.trim() === "") {
+    fail(`--${name} must be an integer, got ${JSON.stringify(value)}`);
+  }
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) {
     fail(`--${name} must be an integer, got ${JSON.stringify(value)}`);

@@ -1,9 +1,18 @@
-export { connectVault, deployVault } from "./vaultClient.js";
+export {
+  connectVault,
+  deployVault,
+  setAllowancesEnabled,
+  setAllowance,
+  readAllowances,
+} from "./vaultClient.js";
 export type {
   VaultClient,
   VaultMethods,
   DeployVaultArgs,
   DeployVaultOptions,
+  AllowancesView,
+  AllowanceReader,
+  AllowanceWriter,
 } from "./vaultClient.js";
 
 export {
@@ -93,5 +102,7 @@ export type {
   MinDepositUpdatedEvent,
   MaxBalanceUpdatedEvent,
   RescuedEvent,
+  AllowancesToggledEvent,
+  AllowanceUpdatedEvent,
   VaultDeployedEvent,
 } from "./events.js";

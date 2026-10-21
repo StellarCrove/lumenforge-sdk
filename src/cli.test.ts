@@ -149,6 +149,15 @@ describe("requiredBigintArg / optionalBigint", () => {
       /--max-balance must be an integer/,
     );
   });
+
+  it("fails on empty or whitespace-only string instead of returning 0n", () => {
+    expect(() => requiredBigintArg("amount", "")).toThrow(
+      /--amount must be an integer, got ""/,
+    );
+    expect(() => requiredBigintArg("amount", "   ")).toThrow(
+      /--amount must be an integer, got "   "/,
+    );
+  });
 });
 
 describe("requiredIntArg", () => {
@@ -159,6 +168,15 @@ describe("requiredIntArg", () => {
   it("fails cleanly on non-numeric input instead of producing NaN", () => {
     expect(() => requiredIntArg("start-ledger", "abc")).toThrow(
       /--start-ledger must be a non-negative integer, got "abc"/,
+    );
+  });
+
+  it("fails on empty or whitespace-only string instead of returning 0", () => {
+    expect(() => requiredIntArg("start-ledger", "")).toThrow(
+      /--start-ledger must be a non-negative integer, got ""/,
+    );
+    expect(() => requiredIntArg("start-ledger", "   ")).toThrow(
+      /--start-ledger must be a non-negative integer, got "   "/,
     );
   });
 
@@ -191,6 +209,15 @@ describe("optionalIntArg", () => {
   it("fails cleanly on non-numeric input", () => {
     expect(() => optionalIntArg("threshold", "abc")).toThrow(
       /--threshold must be an integer, got "abc"/,
+    );
+  });
+
+  it("fails on empty or whitespace-only string instead of returning 0", () => {
+    expect(() => optionalIntArg("threshold", "")).toThrow(
+      /--threshold must be an integer, got ""/,
+    );
+    expect(() => optionalIntArg("threshold", "  ")).toThrow(
+      /--threshold must be an integer, got "  "/,
     );
   });
 

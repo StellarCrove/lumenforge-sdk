@@ -57,6 +57,15 @@ export interface RescuedEvent {
   to: string;
   amount: bigint;
 }
+export interface AllowancesToggledEvent {
+  type: "allowances_toggled";
+  enabled: boolean;
+}
+export interface AllowanceUpdatedEvent {
+  type: "allowance_updated";
+  depositor: string;
+  remaining: bigint;
+}
 
 /** Every event `lumen_vault` can publish. */
 export type VaultEvent =
@@ -69,7 +78,9 @@ export type VaultEvent =
   | OwnerTransferredEvent
   | MinDepositUpdatedEvent
   | MaxBalanceUpdatedEvent
-  | RescuedEvent;
+  | RescuedEvent
+  | AllowancesToggledEvent
+  | AllowanceUpdatedEvent;
 
 export interface VaultDeployedEvent {
   type: "vault_deployed";
@@ -105,6 +116,8 @@ const VAULT_EVENT_SHAPES: Record<string, EventShape> = {
   min_deposit_updated: { topics: [], data: ["min_deposit"] },
   max_balance_updated: { topics: [], data: ["max_balance"] },
   rescued: { topics: ["token", "to"], data: ["amount"] },
+  allowances_toggled: { topics: [], data: ["enabled"] },
+  allowance_updated: { topics: ["depositor"], data: ["remaining"] },
 };
 
 const FACTORY_EVENT_SHAPES: Record<string, EventShape> = {
@@ -138,6 +151,12 @@ function decode<T extends { type: string }>(
   if (topicVals.length !== shape.topics.length) return undefined;
 
   const dataVal = scValToNative(event.value);
+  if (
+    shape.data.length > 0 &&
+    (typeof dataVal !== "object" || dataVal === null || Array.isArray(dataVal))
+  ) {
+    return undefined;
+  }
   const dataObj =
     shape.data.length === 0 ? {} : (dataVal as Record<string, unknown>);
 

@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.16.0] - 2026-10-21
+
+### Added
+
+- `vaultClient`: added `readAllowances`, `setAllowance`, `setAllowancesEnabled`, `AllowancesView`, `AllowanceReader`, and `AllowanceWriter` high-level helpers matching the documented allowance workflow.
+- `events`: added `AllowancesToggledEvent` (`allowances_toggled`) and `AllowanceUpdatedEvent` (`allowance_updated`) to `VaultEvent` and `VAULT_EVENT_SHAPES`.
+- `events`: added `subscribeVaultEvents` reactive polling stream listener.
+- `keeper`: added `batchKeepAlive` multi-vault transaction builder.
+- `retry`: added `withRetry` exponential backoff and jitter helper and `retryConfig` client option.
+- CLI: added global `--json` flag for machine-readable output.
+
+### Fixed
+
+- `events`: guarded `parseVaultEvents` against malformed non-object `event.value` payloads so they return `null` instead of throwing `TypeError`.
+- CLI: rejected empty and whitespace-only strings in `parseBigintArg`, `requiredIntArg`, and `optionalIntArg` instead of silently coercing them to `0n` / `0`.
+- `test/fixtures/lumen_vault.wasm`: updated compiled Wasm fixture to `lumen_vault` 0.6.1.
+
 ## [0.15.0] - 2026-10-12
 
 ### Added
