@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   getFactorySnapshot,
   getVaultSnapshot,
   type FactoryReader,
   type VaultReader,
 } from "./snapshot.js";
+import {
+  readAllowances,
+  setAllowance,
+  setAllowancesEnabled,
+} from "./vaultClient.js";
 
 function fakeVault(overrides: Partial<VaultReader> = {}): VaultReader {
   return {
@@ -125,6 +130,57 @@ describe("getFactorySnapshot", () => {
     };
     await expect(getFactorySnapshot(factory)).rejects.toThrow(
       "NotInitialized",
+    );
+  });
+});
+
+describe("readAllowances / setAllowance / setAllowancesEnabled", () => {
+  it("reads enabled state, members list, and per-member remaining allowances", async () => {
+    const allowances: Record<string, bigint> = {
+      GALICE: 500n,
+      GBOB: 1200n,
+    };
+    const reader = {
+      allowances_enabled: async () => ({ result: true }),
+      allowance_members: async () => ({ result: ["GALICE", "GBOB"] }),
+      allowance: async ({ depositor }: { depositor: string }) => ({
+        result: allowances[depositor] ?? 0n,
+      }),
+    };
+
+    const view = await readAllowances(reader);
+    expect(view).toEqual({
+      enabled: true,
+      members: ["GALICE", "GBOB"],
+      remaining: {
+        GALICE: 500n,
+        GBOB: 1200n,
+      },
+    });
+  });
+
+  it("setAllowance rejects negative amounts before calling the contract", async () => {
+    const set_allowance = vi.fn();
+    await expect(
+      setAllowance({ set_allowance }, "GALICE", -1n),
+    ).rejects.toThrow(/amount must be non-negative/);
+    expect(set_allowance).not.toHaveBeenCalled();
+  });
+
+  it("setAllowance and setAllowancesEnabled forward arguments to the contract", async () => {
+    const set_allowance = vi.fn().mockResolvedValue({ result: null });
+    const set_allowances_enabled = vi.fn().mockResolvedValue({ result: null });
+
+    await setAllowance({ set_allowance }, "GALICE", 100n);
+    expect(set_allowance).toHaveBeenCalledWith(
+      { depositor: "GALICE", amount: 100n },
+      undefined,
+    );
+
+    await setAllowancesEnabled({ set_allowances_enabled }, true);
+    expect(set_allowances_enabled).toHaveBeenCalledWith(
+      { enabled: true },
+      undefined,
     );
   });
 });

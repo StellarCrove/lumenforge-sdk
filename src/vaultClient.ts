@@ -132,3 +132,92 @@ export function deployVault(
     errorTypes: VAULT_ERROR_TYPES,
   });
 }
+
+/**
+ * Snapshot of a vault's depositor-allowance configuration and remaining
+ * per-address allowances (`lumen_vault` >= 0.6.0).
+ */
+export interface AllowancesView {
+  enabled: boolean;
+  members: string[];
+  remaining: Record<string, bigint>;
+}
+
+/** Read-only subset of `VaultClient` needed by {@link readAllowances}. */
+export interface AllowanceReader {
+  allowances_enabled(options?: MethodOptions): Promise<{ result: boolean }>;
+  allowance_members(options?: MethodOptions): Promise<{ result: string[] }>;
+  allowance(
+    args: { depositor: string },
+    options?: MethodOptions,
+  ): Promise<{ result: bigint }>;
+}
+
+/** Write subset of `VaultClient` needed by {@link setAllowance} and {@link setAllowancesEnabled}. */
+export interface AllowanceWriter {
+  set_allowances_enabled(
+    args: { enabled: boolean },
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<null>>;
+  set_allowance(
+    args: { depositor: string; amount: bigint },
+    options?: MethodOptions,
+  ): Promise<AssembledTransaction<null>>;
+}
+
+/**
+ * Enables or disables per-depositor allowance enforcement on `vault`
+ * (owner-only). Returns the assembled transaction — call `.signAndSend()`
+ * to submit it.
+ */
+export function setAllowancesEnabled(
+  vault: Pick<AllowanceWriter, "set_allowances_enabled">,
+  enabled: boolean,
+  options?: MethodOptions,
+): Promise<AssembledTransaction<null>> {
+  return vault.set_allowances_enabled({ enabled }, options);
+}
+
+/**
+ * Sets the remaining deposit allowance for `depositor` on `vault`
+ * (owner-only). Passing `0n` removes `depositor` from the member list and
+ * frees a slot. Rejects before simulation if `amount` is negative.
+ */
+export function setAllowance(
+  vault: Pick<AllowanceWriter, "set_allowance">,
+  depositor: string,
+  amount: bigint,
+  options?: MethodOptions,
+): Promise<AssembledTransaction<null>> {
+  if (amount < 0n) {
+    return Promise.reject(
+      new Error(`setAllowance: amount must be non-negative, got ${amount}`),
+    );
+  }
+  return vault.set_allowance({ depositor, amount }, options);
+}
+
+/**
+ * Reads `allowances_enabled`, `allowance_members`, and each listed
+ * member's remaining allowance in parallel.
+ */
+export async function readAllowances(
+  vault: AllowanceReader,
+): Promise<AllowancesView> {
+  const [enabledRes, membersRes] = await Promise.all([
+    vault.allowances_enabled(),
+    vault.allowance_members(),
+  ]);
+  const members = membersRes.result;
+  const remainingEntries = await Promise.all(
+    members.map(async (depositor) => {
+      const { result } = await vault.allowance({ depositor });
+      return [depositor, result] as const;
+    }),
+  );
+  return {
+    enabled: enabledRes.result,
+    members,
+    remaining: Object.fromEntries(remainingEntries),
+  };
+}

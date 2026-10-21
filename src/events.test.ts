@@ -161,6 +161,34 @@ describe("decodeVaultEvent", () => {
     expect(decodeVaultEvent(event([], dataMap({})))).toBeUndefined();
   });
 
+  it("decodes allowances_toggled", () => {
+    const e = event(
+      [symbol("allowances_toggled")],
+      dataMap({ enabled: nativeToScVal(true, { type: "bool" }) }),
+    );
+    expect(decodeVaultEvent(e)).toEqual({
+      type: "allowances_toggled",
+      enabled: true,
+    });
+  });
+
+  it("decodes allowance_updated", () => {
+    const e = event(
+      [symbol("allowance_updated"), address(from)],
+      dataMap({ remaining: i128(250n) }),
+    );
+    expect(decodeVaultEvent(e)).toEqual({
+      type: "allowance_updated",
+      depositor: from,
+      remaining: 250n,
+    });
+  });
+
+  it("returns undefined when event.value is not a map/object for an event expecting data fields", () => {
+    const malformed = event([symbol("deposit"), address(from)], voidVal());
+    expect(decodeVaultEvent(malformed)).toBeUndefined();
+  });
+
   it("returns undefined when the topic count doesn't match the known shape", () => {
     // "deposit" should have exactly one topic field (from); two is wrong.
     const e = event(

@@ -3,7 +3,6 @@ import {
   calculateBackoff,
   isTransientError,
   withRetry,
-  type RetryOptions,
 } from "./retry.js";
 
 describe("isTransientError", () => {
